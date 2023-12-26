@@ -1,0 +1,27 @@
+service: "animal-sell-buy"
+
+provider:
+    name: aws
+    runtime: nodejs18.x
+    stage: dev
+    region: ap-south-1
+    apiGateway:
+        binaryMediaTypes:
+            - "multipart/form-data"
+functions:
+    app:
+        handler: server.handler
+        name: animal-sell-buy
+        events:
+            - http:
+                  path: /
+                  method: ANY
+                  cors: true
+            - http:
+                  path: /{proxy+}
+                  method: ANY
+                  cors: true
+
+plugins:
+    - serverless-offline
+    # - serverless-event-body-option
