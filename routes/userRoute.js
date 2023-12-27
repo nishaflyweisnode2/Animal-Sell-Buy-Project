@@ -29,5 +29,19 @@ module.exports = (app) => {
     app.put('/api/v1/user/address/:id', [authJwt.verifyToken], auth.updateAddressById);
     app.delete('/api/v1/user/address/:id', [authJwt.verifyToken], auth.deleteAddressById);
     app.get('/api/v1/user/address/type/:type', [authJwt.verifyToken], auth.getAddressByType);
+    app.put('/api/v1/user/notifications/:notificationId', [authJwt.verifyToken], auth.markNotificationAsRead);
+    app.get('/api/v1/user/notifications/user/:userId', [authJwt.verifyToken], auth.getNotificationsForUser);
+    app.get('/api/v1/user/notifications/user', [authJwt.verifyToken], auth.getAllNotificationsForUser);
+    app.get("/api/v1/user/Category/allCategory", [authJwt.verifyToken], auth.getCategories);
+    app.get("/api/v1/user/SubCategory/allSubCategory", [authJwt.verifyToken], auth.getSubCategories);
+    app.get('/api/v1/user/SubCategory/category/:categoryId', [authJwt.verifyToken], auth.getSubCategoriesByCategoryId);
+    app.get('/api/v1/user/animals', [authJwt.verifyToken], auth.getAllAnimals);
+    app.get('/api/v1/user/category/:categoryId', [authJwt.verifyToken], auth.getAnimalsByCategory);
+    app.get('/api/v1/user/subCategory/:subCategoryId', [authJwt.verifyToken], auth.getAnimalsBySubCategory);
+    app.get('/api/v1/user/animal/search', [authJwt.verifyToken], auth.searchAnimals);
+    app.get('/api/v1/user/animals/:id', [authJwt.verifyToken], auth.getAnimalById);
+    app.post('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.addReview);
+    app.get('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.getAllReviews);
+    app.get('/api/v1/user/animals/:id/reviews/user', [authJwt.verifyToken], auth.getReviewsForUserAndAnimal);
 
 }

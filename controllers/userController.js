@@ -2,8 +2,12 @@ const User = require('../models/userModel');
 const authConfig = require("../configs/auth.config");
 const jwt = require("jsonwebtoken");
 const newOTP = require("otp-generators");
+const mongoose = require('mongoose');
 const Notification = require('../models/notificationModel');
 const Address = require("../models/addressModel");
+const Category = require("../models/categoryModel");
+const SubCategory = require("../models/subCategoryModel");
+const Animal = require('../models/animalModel');
 
 
 
@@ -457,5 +461,289 @@ exports.getAddressByType = async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: `Failed to retrieve address for type: ${type}` });
+    }
+};
+
+exports.markNotificationAsRead = async (req, res) => {
+    try {
+        const notificationId = req.params.notificationId;
+
+        const notification = await Notification.findByIdAndUpdate(
+            notificationId,
+            { status: 'read' },
+            { new: true }
+        );
+
+        if (!notification) {
+            return res.status(404).json({ status: 404, message: 'Notification not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Notification marked as read', data: notification });
+    } catch (error) {
+        return res.status(500).json({ status: 500, message: 'Error marking notification as read', error: error.message });
+    }
+};
+
+exports.getNotificationsForUser = async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const notifications = await Notification.find({ recipient: userId });
+
+        return res.status(200).json({ status: 200, message: 'Notifications retrieved successfully', data: notifications });
+    } catch (error) {
+        return res.status(500).json({ status: 500, message: 'Error retrieving notifications', error: error.message });
+    }
+};
+
+exports.getAllNotificationsForUser = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found', data: null });
+        }
+        const notifications = await Notification.find({ recipient: userId });
+
+        return res.status(200).json({ status: 200, message: 'Notifications retrieved successfully', data: notifications });
+    } catch (error) {
+        return res.status(500).json({ status: 500, message: 'Error retrieving notifications', error: error.message });
+    }
+};
+
+exports.getCategories = async (req, res) => {
+    try {
+        const categories = await Category.find({});
+        return res.status(201).json({ message: "Category Found", status: 200, data: categories, });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
+    }
+};
+
+exports.getSubCategories = async (req, res) => {
+    try {
+        const SubCategories = await SubCategory.find({}).populate('Category');
+        return res.status(201).json({ message: "SubCategories Found", status: 200, data: SubCategories, });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
+    }
+};
+
+exports.getSubCategoriesByCategoryId = async (req, res) => {
+    try {
+        const { categoryId } = req.params;
+
+        const SubCategories = await SubCategory.find({ Category: categoryId }).populate('Category');
+
+        if (!SubCategories || SubCategories.length === 0) {
+            return res.status(404).json({ message: "Subcategories Not Found for the specified Category ID", status: 404, data: {} });
+        }
+
+        return res.status(200).json({ message: "SubCategories Found", status: 200, data: SubCategories });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
+    }
+};
+
+exports.getAllAnimals = async (req, res) => {
+    try {
+        const animals = await Animal.find().populate('sellerDetails reviews.user category subCategory owner');
+        res.status(200).json({ message: 'Animals retrieved successfully', data: animals });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalsByCategory = async (req, res) => {
+    try {
+        const categoryId = req.params.categoryId;
+
+        if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+            return res.status(400).json({ message: 'Invalid category ID', data: {} });
+        }
+
+        const animals = await Animal.find({ 'category': categoryId })
+            .populate('sellerDetails reviews.user category subCategory owner');
+
+        res.status(200).json({ message: 'Animals retrieved successfully', data: animals });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.searchAnimals = async (req, res) => {
+    try {
+        const { search } = req.query;
+
+        const animalCount = await Animal.countDocuments();
+
+        if (search) {
+            let data1 = [
+                {
+                    $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "category" },
+                },
+                { $unwind: "$category" },
+                {
+                    $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategory", },
+                },
+                { $unwind: "$subCategory" },
+                {
+                    $match: {
+                        $or: [
+                            { "category.name": { $regex: search, $options: "i" }, },
+                            { "subCategory.name": { $regex: search, $options: "i" }, },
+                            { "name": { $regex: search, $options: "i" }, },
+                            { "description": { $regex: search, $options: "i" }, },
+                            { "breed": { $regex: search, $options: "i" }, },
+                        ]
+                    }
+                },
+                { $sort: { numOfReviews: -1 } }
+            ]
+            let apiFeature = await Animal.aggregate(data1);
+            return res.status(200).json({ status: 200, message: "Animal data found.", data: apiFeature, count: animalCount });
+        } else {
+            let apiFeature = await Animal.aggregate([
+                { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "category" } },
+                { $unwind: "$category" },
+                { $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategory", }, },
+                { $unwind: "$subCategory" },
+                { $sort: { numOfReviews: -1 } }
+            ]);
+
+            return res.status(200).json({ status: 200, message: "Animal data found.", data: apiFeature, count: animalCount });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 500, message: 'Error searching products', error: error.message });
+    }
+};
+
+exports.getAnimalsBySubCategory = async (req, res) => {
+    try {
+        const subCategoryId = req.params.subCategoryId;
+
+        if (!mongoose.Types.ObjectId.isValid(subCategoryId)) {
+            return res.status(400).json({ message: 'Invalid category ID', data: {} });
+        }
+
+        const animals = await Animal.find({ 'subCategory': subCategoryId })
+            .populate('sellerDetails reviews.user category subCategory owner');
+
+        res.status(200).json({ message: 'Animals retrieved successfully', data: animals });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalById = async (req, res) => {
+    try {
+        const animal = await Animal.findById(req.params.id).populate('sellerDetails reviews.user category subCategory owner');
+        if (!animal) {
+            return res.status(404).json({ message: 'Animal not found', data: {} });
+        }
+        res.status(200).json({ message: 'Animal retrieved successfully', data: animal });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.addReview = async (req, res) => {
+    try {
+        const { rating, comment } = req.body;
+        const animalId = req.params.id;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const animal = await Animal.findById(animalId);
+        if (!animal) {
+            return res.status(404).json({ message: 'Animal not found', data: {} });
+        }
+
+        if (rating < 0 || rating > 5) {
+            return res.status(400).json({ message: 'Invalid rating. Rating should be between 0 and 5.', data: {} });
+        }
+
+        const newReview = { user: user._id, name: user.firstName + " " + user.lastName, rating, comment };
+        animal.reviews.push(newReview);
+
+        animal.rating = parseFloat(((animal.rating * animal.numOfUserReviews + rating) / (animal.numOfUserReviews + 1)).toFixed(2));
+
+        animal.numOfUserReviews += 1;
+        await animal.save();
+
+        res.status(201).json({ message: 'Review added successfully', data: newReview });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllReviews = async (req, res) => {
+    try {
+        const animalId = req.params.id;
+
+        const animal = await Animal.findById(animalId).populate({
+            path: 'reviews.user',
+            select: 'firstName lastName image mobileNumber email',
+        });
+        if (!animal) {
+            return res.status(404).json({ message: 'Animal not found', data: {} });
+        }
+
+        const reviews = animal.reviews;
+
+        res.status(200).json({ message: 'Reviews retrieved successfully', data: reviews });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getReviewsForUserAndAnimal = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const animalId = req.params.id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const animal = await Animal.findById(animalId).populate({
+            path: 'reviews.user',
+            select: 'firstName lastName image mobileNumber email',
+        });
+        if (!animal) {
+            return res.status(404).json({ message: 'Animal not found', data: {} });
+        }
+
+        const userReview = animal.reviews.find(review => review.user.equals(userId));
+
+        if (!userReview) {
+            return res.status(404).json({ message: 'Review not found for the specified user and animal', data: {} });
+        }
+
+        res.status(200).json({ message: 'Review retrieved successfully', data: userReview });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
