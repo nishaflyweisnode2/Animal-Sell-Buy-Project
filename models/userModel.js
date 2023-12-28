@@ -62,6 +62,18 @@ const userSchema = new mongoose.Schema({
     socialType: {
         type: String,
     },
+    favouriteAnimal: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Animal',
+        }
+    ],
+    favouriteSeller: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'SellerDetails',
+        }
+    ],
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);

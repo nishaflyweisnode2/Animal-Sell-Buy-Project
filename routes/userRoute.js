@@ -36,6 +36,7 @@ module.exports = (app) => {
     app.get("/api/v1/user/SubCategory/allSubCategory", [authJwt.verifyToken], auth.getSubCategories);
     app.get('/api/v1/user/SubCategory/category/:categoryId', [authJwt.verifyToken], auth.getSubCategoriesByCategoryId);
     app.get('/api/v1/user/animals', [authJwt.verifyToken], auth.getAllAnimals);
+    app.get('/api/v1/user/animals/user', [authJwt.verifyToken], auth.getAllAnimalsForUser);
     app.get('/api/v1/user/category/:categoryId', [authJwt.verifyToken], auth.getAnimalsByCategory);
     app.get('/api/v1/user/subCategory/:subCategoryId', [authJwt.verifyToken], auth.getAnimalsBySubCategory);
     app.get('/api/v1/user/animal/search', [authJwt.verifyToken], auth.searchAnimals);
@@ -43,5 +44,22 @@ module.exports = (app) => {
     app.post('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.addReview);
     app.get('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.getAllReviews);
     app.get('/api/v1/user/animals/:id/reviews/user', [authJwt.verifyToken], auth.getReviewsForUserAndAnimal);
+    app.post('/api/v1/user/seller-details/user', [authJwt.verifyToken], auth.createSellerDetails);
+    app.get('/api/v1/user/seller-details/user', [authJwt.verifyToken], auth.getAllSellerDetailsForUser);
+    app.get('/api/v1/user/seller-details/animal/:animalId', [authJwt.verifyToken], auth.getSellerDetailsByAnimal);
+    app.get('/api/v1/user/seller-details/:id', [authJwt.verifyToken], auth.getSellerDetailsById);
+    app.put('/api/v1/user/seller-details/:id', [authJwt.verifyToken], auth.updateSellerDetails);
+    app.delete('/api/v1/user/seller-details/:id', [authJwt.verifyToken], auth.deleteSellerDetailsById);
+    app.post('/api/v1/user/addFavoriteSeller/:sellerId', [authJwt.verifyToken], auth.addFavoriteSeller);
+    app.post('/api/v1/user/addFavoriteAnimal/:animalId', [authJwt.verifyToken], auth.addFavoriteAnimal);
+    app.delete('/api/v1/user/removeFavoriteSeller/:sellerId', [authJwt.verifyToken], auth.removeFavoriteSeller);
+    app.delete('/api/v1/user/removeFavoriteAnimal/:animalId', [authJwt.verifyToken], auth.removeFavoriteAnimal);
+    app.get('/api/v1/user/getFavoriteSellers', [authJwt.verifyToken], auth.getFavoriteSellers);
+    app.get('/api/v1/user/getFavoriteAnimals', [authJwt.verifyToken], auth.getFavoriteAnimals);
+    app.get('/api/v1/user/coupons', [authJwt.verifyToken], auth.getAllCoupons);
+    app.get('/api/v1/user/coupons/:id', [authJwt.verifyToken], auth.getCouponById);
+    app.get('/api/v1/user/banners', [authJwt.verifyToken], auth.getAllBanners);
+    app.get('/api/v1/user/banners/:id', [authJwt.verifyToken], auth.getBannerById);
+
 
 }

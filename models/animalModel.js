@@ -62,10 +62,6 @@ const animalSchema = new mongoose.Schema({
     milkProduction: {
         type: String,
     },
-    sellerDetails: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-    },
     rating: {
         type: Number,
         default: 0,
