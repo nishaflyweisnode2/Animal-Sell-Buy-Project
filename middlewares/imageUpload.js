@@ -19,8 +19,10 @@ const storage4 = new CloudinaryStorage({ cloudinary: cloudinary, params: { folde
 const couponImage = multer({ storage: storage4 });
 const storage5 = new CloudinaryStorage({ cloudinary: cloudinary, params: { folder: "Animal-sell-buy-Backend/bannerImage", allowed_formats: ["jpg", "jpeg", "png", "PNG", "xlsx", "xls", "pdf", "PDF"], }, });
 const bannerImage = multer({ storage: storage5 });
+const storage6 = new CloudinaryStorage({ cloudinary: cloudinary, params: { folder: "Animal-sell-buy-Backend/publishAddImage", allowed_formats: ["jpg", "jpeg", "png", "PNG", "xlsx", "xls", "pdf", "PDF"], }, });
+const publishAddImage = multer({ storage: storage6 });
 
 
 
 
-module.exports = { profileImage, categoryUpload, subCategoryUpload, animalImage, couponImage, bannerImage }
+module.exports = { profileImage, categoryUpload, subCategoryUpload, animalImage, couponImage, bannerImage, publishAddImage }

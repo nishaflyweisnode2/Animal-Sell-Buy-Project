@@ -11,6 +11,12 @@ const Animal = require('../models/animalModel');
 const SellerDetails = require('../models/sellerDetailsModel');
 const Coupon = require('../models/couponModel');
 const Banner = require('../models/bannerModel');
+const PublishAd = require('../models/publishAddModel');
+const SubscriptionPlan = require('../models/subscriptionPlanModel');
+const UserSubscription = require('../models/userSubscriptionModel');
+const cron = require('node-cron');
+const VoiceCall = require('../models/voiceCallModel');
+
 
 
 
@@ -1131,3 +1137,507 @@ exports.getBannerById = async (req, res) => {
         res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
+
+exports.createPublishAd = async (req, res) => {
+    try {
+        const { species, breed, age, gender, colour, location, address, healthCondition, vaccinationStatus, medicalHistory, microchipID, temperament, trainingLevel, socialization, videos, price, negotiation, reasonForSelling } = req.body;
+
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const findCategory = await Category.findById(species);
+        if (!findCategory) {
+            return res.status(409).json({ message: "Category Not found.", status: 404, data: {} });
+        }
+
+        const findSubCategory = await SubCategory.findById(breed);
+        if (!findSubCategory) {
+            return res.status(409).json({ message: "SubCategory Not Found.", status: 404, data: {} });
+        }
+
+        let images = [];
+        if (req.files) {
+            for (let j = 0; j < req.files.length; j++) {
+                let obj = {
+                    img: req.files[j].path,
+                };
+                images.push(obj);
+            }
+        }
+
+        const { type, coordinates } = location;
+        const formattedLocation = {
+            type,
+            coordinates: coordinates.map(coord => parseFloat(coord)),
+        };
+
+        const formattedAddress = {
+            houseNo: address.houseNo,
+            street: address.street,
+            state: address.state,
+            city: address.city,
+            pincode: address.pincode,
+        };
+
+        const newPublishAd = new PublishAd({
+            postBy: user._id,
+            species,
+            breed,
+            age,
+            gender,
+            colour,
+            location: formattedLocation,
+            address: formattedAddress,
+            healthCondition,
+            vaccinationStatus,
+            medicalHistory,
+            microchipID,
+            temperament,
+            trainingLevel,
+            socialization,
+            images,
+            videos,
+            price,
+            negotiation,
+            reasonForSelling,
+        });
+
+        await newPublishAd.save();
+
+        res.status(201).json({ message: 'Publish ad created successfully', data: newPublishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllPublishAds = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const allPublishAds = await PublishAd.find({ postBy: userId }).populate('species breed');
+        res.status(200).json({ message: 'All publish ads retrieved successfully', data: allPublishAds });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getPublishAdById = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const publishAd = await PublishAd.findById(publishAdId).populate('species breed');
+
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish ad not found' });
+        }
+
+        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updatePublishAdById = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const updateFields = req.body;
+
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        if (updateFields.species) {
+            const findCategory = await Category.findById(updateFields.species);
+            if (!findCategory) {
+                return res.status(409).json({ message: "Category Not found.", status: 404, data: {} });
+            }
+        }
+
+        if (updateFields.breed) {
+            const findSubCategory = await SubCategory.findById(updateFields.breed);
+            if (!findSubCategory) {
+                return res.status(409).json({ message: "SubCategory Not Found.", status: 404, data: {} });
+            }
+        }
+
+
+        if (updateFields.location) {
+            const { type, coordinates } = updateFields.location;
+            updateFields.location = {
+                type,
+                coordinates: coordinates.map(coord => parseFloat(coord)),
+            };
+        }
+
+        if (updateFields.address) {
+            updateFields.address = {
+                houseNo: updateFields.address.houseNo,
+                street: updateFields.address.street,
+                state: updateFields.address.state,
+                city: updateFields.address.city,
+                pincode: updateFields.address.pincode,
+            };
+        }
+
+        if (req.files) {
+            if (req.files.images) {
+                updateFields.images = req.files.images.map(image => ({ img: image.path }));
+            }
+
+            if (req.files.videos) {
+                updateFields.videos = req.files.videos.map(video => ({ vid: video.path }));
+            }
+        }
+
+        const updatedPublishAd = await PublishAd.findByIdAndUpdate(
+            { _id: publishAdId, postBy: userId },
+            updateFields,
+            { new: true }
+        );
+
+        if (!updatedPublishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish ad not found' });
+        }
+
+        res.status(200).json({ status: 200, message: 'Publish ad updated successfully', data: updatedPublishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: 500, error: 'Server error' });
+    }
+};
+
+exports.deletePublishAdById = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+
+        const deletedPublishAd = await PublishAd.findByIdAndDelete(publishAdId);
+
+        if (!deletedPublishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish ad not found' });
+        }
+
+        res.status(200).json({ message: 'Publish ad deleted successfully', data: deletedPublishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllSubscriptionPlans = async (req, res) => {
+    try {
+        const allSubscriptionPlans = await SubscriptionPlan.find();
+
+        return res.status(200).json({ status: 200, message: 'All subscription plans retrieved successfully', data: allSubscriptionPlans });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getSubscriptionPlanById = async (req, res) => {
+    try {
+        const subscriptionPlanId = req.params.id;
+        const subscriptionPlan = await SubscriptionPlan.findById(subscriptionPlanId);
+
+        if (!subscriptionPlan) {
+            return res.status(404).json({ status: 404, message: 'Subscription plan not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Subscription plan retrieved successfully', data: subscriptionPlan });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+function calculateEndDate(startDate, duration) {
+    const [value, unit] = duration.split(' ');
+
+    const unitMapping = {
+        month: 'Month',
+    };
+
+    const endDate = new Date(startDate);
+    endDate[`set${unitMapping[unit]}`](endDate[`get${unitMapping[unit]}`]() + parseInt(value));
+
+    return endDate;
+}
+
+exports.createUserSubscription = async (req, res) => {
+    try {
+        const { subscriptionPlanId } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const planExists = await SubscriptionPlan.findById(subscriptionPlanId);
+
+        if (!planExists) {
+            return res.status(404).json({ status: 404, message: 'Subscription plan not found' });
+        }
+
+        console.log("planExists.duration", planExists.duration);
+        const activeSubscription = await UserSubscription.findOne({
+            user: userId,
+            isActive: true,
+        });
+
+        if (activeSubscription) {
+            return res.status(400).json({ status: 400, message: 'User already has an active subscription' });
+        }
+
+        const newUserSubscription = new UserSubscription({
+            user: user._id,
+            subscriptionPlan: subscriptionPlanId,
+            startDate: new Date(),
+            endDate: calculateEndDate(new Date(), planExists.duration),
+            isActive: true,
+        });
+
+        await newUserSubscription.save();
+
+        return res.status(201).json({ status: 201, message: 'User subscription created successfully', data: newUserSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllUserSubscriptions = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const allUserSubscriptions = await UserSubscription.find({ user: userId }).populate('user subscriptionPlan');
+        return res.status(200).json({ status: 200, message: 'All user subscriptions retrieved successfully', data: allUserSubscriptions });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getUserSubscriptionById = async (req, res) => {
+    try {
+        const userSubscriptionId = req.params.id;
+        const userSubscription = await UserSubscription.findById(userSubscriptionId).populate('user subscriptionPlan');
+
+        if (!userSubscription) {
+            return res.status(404).json({ status: 404, message: 'User subscription not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'User subscription retrieved successfully', data: userSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateUserSubscriptionById = async (req, res) => {
+    try {
+        const userSubscriptionId = req.params.id;
+        const updateFields = req.body;
+
+        const updatedUserSubscription = await UserSubscription.findByIdAndUpdate(
+            userSubscriptionId,
+            updateFields,
+            { new: true }
+        );
+
+        if (!updatedUserSubscription) {
+            return res.status(404).json({ status: 404, message: 'User subscription not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'User subscription updated successfully', data: updatedUserSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+//0 0,12 * * *
+cron.schedule('* * * * *', async () => {
+    console.log('Running subscription update task...');
+
+    try {
+        const expiredSubscriptions = await UserSubscription.find({
+            endDate: { $lte: new Date() },
+            isActive: true,
+            status: "Subscriber",
+            paymentStatus: "Paid",
+        });
+
+        await Promise.all(
+            expiredSubscriptions.map(async (subscription) => {
+                subscription.isActive = false;
+                subscription.status = "UnSubscriber";
+                await subscription.save();
+            })
+        );
+
+        console.log('Subscription update task completed.');
+    } catch (error) {
+        console.error('Error in subscription update task:', error);
+    }
+});
+console.log('Subscription updater scheduled.');
+
+
+exports.initiateVoiceCall = async (req, res) => {
+    try {
+        const { receiverId, duration } = req.body;
+        const callerId = req.user._id;
+
+        let caller = await User.findById(callerId);
+        let receiver = await User.findById(receiverId);
+
+        if (!caller) {
+            caller = await User.findById(receiverId);
+        }
+
+        if (!receiver) {
+            receiver = await User.findById(callerId);
+        }
+
+        if (!caller || !receiver) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const startTime = new Date();
+        const endTime = new Date(startTime.getTime() + duration * 1000);
+
+        const voiceCall = new VoiceCall({
+            caller: callerId,
+            receiver: receiverId,
+            duration,
+            startTime,
+            endTime,
+        });
+
+        await voiceCall.save();
+
+        // You might want to send a notification or trigger the call in your signaling mechanism
+
+        return res.status(201).json({ status: 201, message: 'Voice call initiated successfully', data: voiceCall });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.acceptVoiceCall = async (req, res) => {
+    try {
+        const voiceCallId = req.params.id;
+        const receiverId = req.user._id;
+
+        const user = await User.findById(receiverId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const voiceCall = await VoiceCall.findOne({
+            _id: voiceCallId,
+            $or: [{ receiver: receiverId }, { caller: receiverId }],
+        });
+
+        if (!voiceCall) {
+            return res.status(404).json({ status: 404, message: 'Voice call not found' });
+        }
+
+        user.IsBusy = true;
+        await user.save();
+
+        voiceCall.status = 'Ongoing';
+        await voiceCall.save();
+
+        // You might want to send a notification or trigger the acceptance in your signaling mechanism
+
+        return res.status(200).json({ status: 200, message: 'Voice call accepted successfully', data: voiceCall });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.endVoiceCall = async (req, res) => {
+    try {
+        const voiceCallId = req.params.id;
+        const userId = req.user._id;
+
+        const voiceCall = await VoiceCall.findOne({
+            _id: voiceCallId,
+            $or: [{ caller: userId }, { receiver: userId }],
+        });
+
+        if (!voiceCall) {
+            return res.status(404).json({ status: 404, message: 'Voice call not found' });
+        }
+
+        voiceCall.status = 'Completed';
+        await voiceCall.save();
+
+        const user = await User.findById(userId);
+        if (user) {
+            user.IsBusy = false;
+            await user.save();
+        }
+
+        // You might want to send a notification or trigger the end in your signaling mechanism
+
+        return res.status(200).json({ status: 200, message: 'Voice call ended successfully', data: voiceCall });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.missedVoiceCall = async (req, res) => {
+    try {
+        const voiceCallId = req.params.id;
+        const userId = req.user._id;
+
+        const voiceCall = await VoiceCall.findOne({
+            _id: voiceCallId,
+            $or: [{ caller: userId }, { receiver: userId }],
+            status: { $ne: 'Ongoing' },
+        });
+
+        if (!voiceCall) {
+            return res.status(404).json({ status: 404, message: 'Missed call not found' });
+        }
+
+        voiceCall.status = 'Missed';
+        await voiceCall.save();
+
+        // You might want to send a notification or handle missed call logic here
+
+        return res.status(200).json({ status: 200, message: 'Missed call marked successfully', data: voiceCall });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+
+
+

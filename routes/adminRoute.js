@@ -62,5 +62,19 @@ module.exports = (app) => {
     app.get('/api/v1/admin/banners/:id', [authJwt.isAdmin], auth.getBannerById);
     app.put('/api/v1/admin/banners/:id', [authJwt.isAdmin], bannerImage.single('image'), auth.updateBannerById);
     app.delete('/api/v1/admin/banners/:id', [authJwt.isAdmin], auth.deleteBannerById);
+    app.post('/api/v1/admin/subscription-plans', [authJwt.isAdmin], auth.createSubscriptionPlan);
+    app.get('/api/v1/admin/subscription-plans', [authJwt.isAdmin], auth.getAllSubscriptionPlans);
+    app.get('/api/v1/admin/subscription-plans/:id', [authJwt.isAdmin], auth.getSubscriptionPlanById);
+    app.put('/api/v1/admin/subscription-plans/:id', [authJwt.isAdmin], auth.updateSubscriptionPlanById);
+    app.delete('/api/v1/admin/subscription-plans/:id', [authJwt.isAdmin], auth.deleteSubscriptionPlanById);
+    app.get('/api/v1/admin/user-subscriptions/get', [authJwt.isAdmin], auth.getAllUserSubscriptions);
+    app.get('/api/v1/admin/user-subscriptions/:id', [authJwt.isAdmin], auth.getUserSubscriptionById);
+    app.put('/api/v1/admin/user-subscriptions/:id', [authJwt.isAdmin], auth.updateUserSubscriptionById);
+    app.delete('/api/v1/admin/user-subscriptions/:id', [authJwt.isAdmin], auth.deleteUserSubscriptionById);
+    app.get('/api/v1/admin/publish-ads/get', [authJwt.isAdmin], auth.getAllPublishAds);
+    app.get('/api/v1/admin/publish-ads/:id', [authJwt.isAdmin], auth.getPublishAdById);
+    app.delete('/api/v1/admin/publish-ads/:id', [authJwt.isAdmin], auth.deletePublishAdById);
+
+
 
 }

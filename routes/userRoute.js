@@ -5,7 +5,7 @@ const router = express()
 
 const authJwt = require("../middlewares/auth");
 
-const { profileImage } = require('../middlewares/imageUpload');
+const { profileImage, publishAddImage } = require('../middlewares/imageUpload');
 
 
 
@@ -60,6 +60,20 @@ module.exports = (app) => {
     app.get('/api/v1/user/coupons/:id', [authJwt.verifyToken], auth.getCouponById);
     app.get('/api/v1/user/banners', [authJwt.verifyToken], auth.getAllBanners);
     app.get('/api/v1/user/banners/:id', [authJwt.verifyToken], auth.getBannerById);
-
+    app.post('/api/v1/user/publish-ads/create', [authJwt.verifyToken], publishAddImage.array('images'), auth.createPublishAd);
+    app.get('/api/v1/user/publish-ads/get', [authJwt.verifyToken], auth.getAllPublishAds);
+    app.get('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], auth.getPublishAdById);
+    app.put('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], publishAddImage.array('images'), auth.updatePublishAdById);
+    app.delete('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], auth.deletePublishAdById);
+    app.get('/api/v1/user/subscription-plans', [authJwt.verifyToken], auth.getAllSubscriptionPlans);
+    app.get('/api/v1/user/subscription-plans/:id', [authJwt.verifyToken], auth.getSubscriptionPlanById);
+    app.post('/api/v1/user/user-subscriptions/create', [authJwt.verifyToken], auth.createUserSubscription);
+    app.get('/api/v1/user/user-subscriptions/get', [authJwt.verifyToken], auth.getAllUserSubscriptions);
+    app.get('/api/v1/user/user-subscriptions/:id', [authJwt.verifyToken], auth.getUserSubscriptionById);
+    app.put('/api/v1/user/user-subscriptions/:id', [authJwt.verifyToken], auth.updateUserSubscriptionById);
+    app.post('/api/v1/user/voice-call/initiate', [authJwt.verifyToken], auth.initiateVoiceCall);
+    app.post('/api/v1/user/voice-call/:id/accept', [authJwt.verifyToken], auth.acceptVoiceCall);
+    app.post('/api/v1/user/voice-call/:id/end', [authJwt.verifyToken], auth.endVoiceCall);
+    app.post('/api/v1/user/voice-call/:id/missed', [authJwt.verifyToken], auth.missedVoiceCall);
 
 }

@@ -11,7 +11,10 @@ const Animal = require('../models/animalModel');
 const SellerDetails = require('../models/sellerDetailsModel');
 const Coupon = require('../models/couponModel');
 const Banner = require('../models/bannerModel');
-
+const PublishAd = require('../models/publishAddModel');
+const SubscriptionPlan = require('../models/subscriptionPlanModel');
+const UserSubscription = require('../models/userSubscriptionModel');
+const cron = require('node-cron');
 
 
 
@@ -234,7 +237,7 @@ exports.createCategory = async (req, res) => {
             }
             const data = { name: req.body.name, image: fileUrl, status: req.body.status, notice: req.body.notice, };
             const category = await Category.create(data);
-            return res.status(200).json({ message: "Category add successfully.", status: 200, data: category });
+            return res.status(200).json({ status: 200, message: "Category add successfully.", data: category });
         }
     } catch (error) {
         return res.status(500).json({ status: 500, message: "internal server error ", data: error.message, });
@@ -267,7 +270,7 @@ exports.updateCategory = async (req, res) => {
         category.status = req.body.status || category.status;
         category.notice = req.body.notice || category.notice;
         let update = await category.save();
-        return res.status(200).json({ message: "Updated Successfully", data: update });
+        return res.status(200).json({ status: 200, message: "Updated Successfully", data: update });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -282,7 +285,7 @@ exports.removeCategory = async (req, res) => {
             return res.status(404).json({ message: "Category Not Found", status: 404, data: {} });
         }
         await Category.findByIdAndDelete(category._id);
-        return res.status(200).json({ message: "Category Deleted Successfully !" });
+        return res.status(200).json({ status: 200, message: "Category Deleted Successfully !" });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -305,7 +308,7 @@ exports.createSubCategory = async (req, res) => {
             // }
             const data = { Category: req.body.Category, name: req.body.name, /*image: fileUrl,*/ status: req.body.status, notice: req.body.notice, };
             const subCategory = await SubCategory.create(data);
-            return res.status(200).json({ message: "Category add successfully.", status: 200, data: subCategory });
+            return res.status(200).json({ status: 200, message: "Category add successfully.", data: subCategory });
         }
     } catch (error) {
         return res.status(500).json({ status: 500, message: "internal server error ", data: error.message, });
@@ -332,7 +335,7 @@ exports.getSubCategoriesByCategoryId = async (req, res) => {
             return res.status(404).json({ message: "Subcategories Not Found for the specified Category ID", status: 404, data: {} });
         }
 
-        return res.status(200).json({ message: "SubCategories Found", status: 200, data: SubCategories });
+        return res.status(200).json({ status: 200, message: "SubCategories Found", data: SubCategories });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -373,7 +376,7 @@ exports.updateSubCategory = async (req, res) => {
         const updatedSubCategories = await SubCategories.save();
         console.log('Updated SubCategories:', SubCategories);
 
-        return res.status(200).json({ message: "Updated Successfully", data: updatedSubCategories });
+        return res.status(200).json({ status: 200, message: "Updated Successfully", data: updatedSubCategories });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -388,7 +391,7 @@ exports.removeSubCategory = async (req, res) => {
             return res.status(404).json({ message: "SubCategories Not Found", status: 404, data: {} });
         }
         await SubCategories.findByIdAndDelete(SubCategories._id);
-        return res.status(200).json({ message: "SubCategories Deleted Successfully !" });
+        return res.status(200).json({ status: 200, message: "SubCategories Deleted Successfully !" });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -442,20 +445,20 @@ exports.createAnimal = async (req, res) => {
         });
 
         await newAnimal.save();
-        res.status(201).json({ message: 'Animal created successfully', data: newAnimal });
+        return res.status(201).json({ message: 'Animal created successfully', data: newAnimal });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
 exports.getAllAnimals = async (req, res) => {
     try {
         const animals = await Animal.find().populate('reviews.user category subCategory owner');
-        res.status(200).json({ message: 'Animals retrieved successfully', data: animals });
+        return res.status(200).json({ status: 200, message: 'Animals retrieved successfully', data: animals });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -469,10 +472,10 @@ exports.getAllAnimalsForUser = async (req, res) => {
         }
 
         const animals = await Animal.find({ owner: userId }).populate('reviews.user category subCategory owner');
-        res.status(200).json({ message: 'Animals retrieved successfully', data: animals });
+        return res.status(200).json({ status: 200, message: 'Animals retrieved successfully', data: animals });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -482,10 +485,10 @@ exports.getAnimalById = async (req, res) => {
         if (!animal) {
             return res.status(404).json({ message: 'Animal not found', data: {} });
         }
-        res.status(200).json({ message: 'Animal retrieved successfully', data: animal });
+        return res.status(200).json({ status: 200, message: 'Animal retrieved successfully', data: animal });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -542,10 +545,10 @@ exports.updateAnimal = async (req, res) => {
         }
 
         await animal.save();
-        res.status(200).json({ message: 'Animal updated successfully', data: animal });
+        return res.status(200).json({ status: 200, message: 'Animal updated successfully', data: animal });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -555,10 +558,10 @@ exports.deleteAnimalById = async (req, res) => {
         if (!animal) {
             return res.status(404).json({ message: 'Animal not found', data: {} });
         }
-        res.status(200).json({ message: 'Animal deleted successfully', data: animal });
+        return res.status(200).json({ status: 200, message: 'Animal deleted successfully', data: animal });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -590,10 +593,10 @@ exports.addReview = async (req, res) => {
         animal.numOfUserReviews += 1;
         await animal.save();
 
-        res.status(201).json({ message: 'Review added successfully', data: newReview });
+        return res.status(201).json({ message: 'Review added successfully', data: newReview });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -617,10 +620,10 @@ exports.getAllReviews = async (req, res) => {
 
         const reviews = animal.reviews;
 
-        res.status(200).json({ message: 'Reviews retrieved successfully', data: reviews });
+        return res.status(200).json({ status: 200, message: 'Reviews retrieved successfully', data: reviews });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Internal server error', data: error.message });
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
 
@@ -682,7 +685,7 @@ exports.createSellerDetails = async (req, res) => {
 exports.getAllSellerDetails = async (req, res) => {
     try {
         const allSellerDetails = await SellerDetails.find().populate('sellerDetails animal');
-        return res.status(200).json({ message: 'All seller details retrieved successfully', data: allSellerDetails });
+        return res.status(200).json({ status: 200, message: 'All seller details retrieved successfully', data: allSellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -699,7 +702,7 @@ exports.getAllSellerDetailsForUser = async (req, res) => {
         }
 
         const userSellerDetails = await SellerDetails.find({ sellerDetails: userId }).populate('sellerDetails animal');
-        return res.status(200).json({ message: 'Seller details retrieved successfully', data: userSellerDetails });
+        return res.status(200).json({ status: 200, message: 'Seller details retrieved successfully', data: userSellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -714,7 +717,7 @@ exports.getSellerDetailsByAnimal = async (req, res) => {
 
         const userSellerDetails = await SellerDetails.find({ animal: animalId }).populate('sellerDetails animal');
 
-        return res.status(200).json({ message: 'Seller details retrieved successfully', data: userSellerDetails });
+        return res.status(200).json({ status: 200, message: 'Seller details retrieved successfully', data: userSellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -727,7 +730,7 @@ exports.getSellerDetailsById = async (req, res) => {
         if (!sellerDetails) {
             return res.status(404).json({ message: 'Seller details not found', data: {} });
         }
-        return res.status(200).json({ message: 'Seller details retrieved successfully', data: sellerDetails });
+        return res.status(200).json({ status: 200, message: 'Seller details retrieved successfully', data: sellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -760,7 +763,7 @@ exports.updateSellerDetails = async (req, res) => {
 
         await sellerDetails.save();
 
-        return res.status(200).json({ message: 'Seller details updated successfully', data: sellerDetails });
+        return res.status(200).json({ status: 200, message: 'Seller details updated successfully', data: sellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -773,7 +776,7 @@ exports.deleteSellerDetailsById = async (req, res) => {
         if (!deletedSellerDetails) {
             return res.status(404).json({ message: 'Seller details not found', data: {} });
         }
-        return res.status(200).json({ message: 'Seller details deleted successfully', data: deletedSellerDetails });
+        return res.status(200).json({ status: 200, message: 'Seller details deleted successfully', data: deletedSellerDetails });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -970,10 +973,10 @@ exports.createCoupon = async (req, res) => {
 exports.getAllCoupons = async (req, res) => {
     try {
         const coupons = await Coupon.find();
-        res.status(200).json({ status: 200, data: coupons });
+        return res.status(200).json({ status: 200, data: coupons });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -986,10 +989,10 @@ exports.getCouponById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Coupon not found' });
         }
 
-        res.status(200).json({ status: 200, data: coupon });
+        return res.status(200).json({ status: 200, data: coupon });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1015,10 +1018,10 @@ exports.updateCouponById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Coupon not found' });
         }
 
-        res.status(200).json({ status: 200, message: 'Coupon updated successfully', data: updatedCoupon });
+        return res.status(200).json({ status: 200, message: 'Coupon updated successfully', data: updatedCoupon });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1031,10 +1034,10 @@ exports.deleteCouponById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Coupon not found' });
         }
 
-        res.status(200).json({ status: 200, message: 'Coupon deleted successfully' });
+        return res.status(200).json({ status: 200, message: 'Coupon deleted successfully' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1064,10 +1067,10 @@ exports.createBanner = async (req, res) => {
 exports.getAllBanners = async (req, res) => {
     try {
         const banners = await Banner.find();
-        res.status(200).json({ status: 200, message: 'Banners retrieved successfully', data: banners });
+        return res.status(200).json({ status: 200, message: 'Banners retrieved successfully', data: banners });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1080,10 +1083,10 @@ exports.getBannerById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Banner not found' });
         }
 
-        res.status(200).json({ status: 200, message: 'Banner retrieved successfully', data: banner });
+        return res.status(200).json({ status: 200, message: 'Banner retrieved successfully', data: banner });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1102,10 +1105,10 @@ exports.updateBannerById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Banner not found' });
         }
 
-        res.status(200).json({ status: 200, message: 'Banner updated successfully', data: updatedBanner });
+        return res.status(200).json({ status: 200, message: 'Banner updated successfully', data: updatedBanner });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
     }
 };
 
@@ -1119,9 +1122,214 @@ exports.deleteBannerById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'Banner not found' });
         }
 
-        res.status(200).json({ status: 200, message: 'Banner deleted successfully', data: deletedBanner });
+        return res.status(200).json({ status: 200, message: 'Banner deleted successfully', data: deletedBanner });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 500, error: 'Server error' });
+        return res.status(500).json({ status: 500, error: 'Server error' });
+    }
+};
+
+exports.createSubscriptionPlan = async (req, res) => {
+    try {
+        const { name, duration, price, features } = req.body;
+
+        const existingPlan = await SubscriptionPlan.findOne({ name });
+        if (existingPlan) {
+            return res.status(400).json({ status: 400, message: 'Subscription plan with this name already exists', data: existingPlan });
+        }
+
+        const newSubscriptionPlan = new SubscriptionPlan({
+            name,
+            duration,
+            price,
+            features,
+        });
+
+        await newSubscriptionPlan.save();
+
+        return res.status(201).json({ message: 'Subscription plan created successfully', data: newSubscriptionPlan });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllSubscriptionPlans = async (req, res) => {
+    try {
+        const allSubscriptionPlans = await SubscriptionPlan.find();
+
+        return res.status(200).json({ status: 200, message: 'All subscription plans retrieved successfully', data: allSubscriptionPlans });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getSubscriptionPlanById = async (req, res) => {
+    try {
+        const subscriptionPlanId = req.params.id;
+        const subscriptionPlan = await SubscriptionPlan.findById(subscriptionPlanId);
+
+        if (!subscriptionPlan) {
+            return res.status(404).json({ status: 404, message: 'Subscription plan not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Subscription plan retrieved successfully', data: subscriptionPlan });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateSubscriptionPlanById = async (req, res) => {
+    try {
+        const subscriptionPlanId = req.params.id;
+        const updateFields = req.body;
+
+        if (updateFields.name) {
+            const existingPlan = await SubscriptionPlan.findOne({ name: updateFields.name });
+
+            if (existingPlan) {
+                return res.status(400).json({ status: 400, message: 'Subscription plan with this name already exists', data: existingPlan });
+            }
+        }
+        const updatedSubscriptionPlan = await SubscriptionPlan.findByIdAndUpdate(
+            subscriptionPlanId,
+            updateFields,
+            { new: true }
+        );
+
+        if (!updatedSubscriptionPlan) {
+            return res.status(404).json({ status: 404, message: 'Subscription plan not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Subscription plan updated successfully', data: updatedSubscriptionPlan });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteSubscriptionPlanById = async (req, res) => {
+    try {
+        const subscriptionPlanId = req.params.id;
+        const deletedSubscriptionPlan = await SubscriptionPlan.findByIdAndDelete(subscriptionPlanId);
+
+        if (!deletedSubscriptionPlan) {
+            return res.status(404).json({ status: 404, message: 'Subscription plan not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Subscription plan deleted successfully', data: deletedSubscriptionPlan });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllUserSubscriptions = async (req, res) => {
+    try {
+        const allUserSubscriptions = await UserSubscription.find().populate('user subscriptionPlan');
+        return res.status(200).json({ status: 200, message: 'All user subscriptions retrieved successfully', data: allUserSubscriptions });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getUserSubscriptionById = async (req, res) => {
+    try {
+        const userSubscriptionId = req.params.id;
+        const userSubscription = await UserSubscription.findById(userSubscriptionId).populate('user subscriptionPlan');
+
+        if (!userSubscription) {
+            return res.status(404).json({ status: 404, message: 'User subscription not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'User subscription retrieved successfully', data: userSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateUserSubscriptionById = async (req, res) => {
+    try {
+        const userSubscriptionId = req.params.id;
+        const updateFields = req.body;
+
+        const updatedUserSubscription = await UserSubscription.findByIdAndUpdate(
+            userSubscriptionId,
+            updateFields,
+            { new: true }
+        );
+
+        if (!updatedUserSubscription) {
+            return res.status(404).json({ status: 404, message: 'User subscription not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'User subscription updated successfully', data: updatedUserSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteUserSubscriptionById = async (req, res) => {
+    try {
+        const userSubscriptionId = req.params.id;
+
+        const deletedUserSubscription = await UserSubscription.findByIdAndDelete(userSubscriptionId);
+
+        if (!deletedUserSubscription) {
+            return res.status(404).json({ status: 404, message: 'User subscription not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'User subscription deleted successfully', data: deletedUserSubscription });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllPublishAds = async (req, res) => {
+    try {
+        const allPublishAds = await PublishAd.find().populate('species breed');
+        res.status(200).json({ message: 'All publish ads retrieved successfully', data: allPublishAds });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getPublishAdById = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const publishAd = await PublishAd.findById(publishAdId).populate('species breed');
+
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish ad not found' });
+        }
+
+        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deletePublishAdById = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+
+        const deletedPublishAd = await PublishAd.findByIdAndDelete(publishAdId);
+
+        if (!deletedPublishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish ad not found' });
+        }
+
+        res.status(200).json({ message: 'Publish ad deleted successfully', data: deletedPublishAd });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
     }
 };
