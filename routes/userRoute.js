@@ -75,5 +75,17 @@ module.exports = (app) => {
     app.post('/api/v1/user/voice-call/:id/accept', [authJwt.verifyToken], auth.acceptVoiceCall);
     app.post('/api/v1/user/voice-call/:id/end', [authJwt.verifyToken], auth.endVoiceCall);
     app.post('/api/v1/user/voice-call/:id/missed', [authJwt.verifyToken], auth.missedVoiceCall);
+    app.post('/api/v1/user/cart/add-to-cart', [authJwt.verifyToken], auth.addToCart);
+    app.get('/api/v1/user/cart/get-cart', [authJwt.verifyToken], auth.getCart);
+    app.put('/api/v1/user/cart/update-cart-item', [authJwt.verifyToken], auth.updateCartItem);
+    app.delete('/api/v1/user/cart/delete-cart-item/:itemId', [authJwt.verifyToken], auth.deleteCartItem);
+    app.post('/api/v1/user/cart/apply-coupon', [authJwt.verifyToken], auth.applyCoupon);
+    app.delete('/api/v1/user/cart/remove-coupon', [authJwt.verifyToken], auth.removeCoupon);
+    app.post('/api/v1/user/cart/address/add', [authJwt.verifyToken], auth.addAddressToCart);
+    app.put('/api/v1/user/cart/address/update', [authJwt.verifyToken], auth.updateAddressInCart);
+    app.delete('/api/v1/user/cart/address/delete', [authJwt.verifyToken], auth.deleteAddressFromCart);
+    app.get('/api/v1/user/cart/address', [authJwt.verifyToken], auth.getAddressForCart);
+    app.post('/api/v1/user/cart/checkout', [authJwt.verifyToken], auth.checkout);
+    app.post('/api/v1/user/order/placeOrder/:orderId', [authJwt.verifyToken], auth.placeOrder);
 
 }

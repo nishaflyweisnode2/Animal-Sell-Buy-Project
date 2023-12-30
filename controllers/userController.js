@@ -16,6 +16,9 @@ const SubscriptionPlan = require('../models/subscriptionPlanModel');
 const UserSubscription = require('../models/userSubscriptionModel');
 const cron = require('node-cron');
 const VoiceCall = require('../models/voiceCallModel');
+const Cart = require('../models/cartModel');
+const Order = require('../models/orderModel');
+
 
 
 
@@ -1505,40 +1508,45 @@ console.log('Subscription updater scheduled.');
 
 exports.initiateVoiceCall = async (req, res) => {
     try {
-        const { receiverId, duration } = req.body;
+        const { receiverId } = req.body;
         const callerId = req.user._id;
 
-        let caller = await User.findById(callerId);
-        let receiver = await User.findById(receiverId);
-
-        if (!caller) {
-            caller = await User.findById(receiverId);
-        }
-
-        if (!receiver) {
-            receiver = await User.findById(callerId);
-        }
+        const caller = await User.findById(callerId);
+        const receiver = await User.findById(receiverId);
 
         if (!caller || !receiver) {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const startTime = new Date();
-        const endTime = new Date(startTime.getTime() + duration * 1000);
+        if (caller.isBusy === true) {
+            return res.status(404).json({ status: 404, message: 'Caller User is Busy' });
+        }
 
-        const voiceCall = new VoiceCall({
-            caller: callerId,
-            receiver: receiverId,
-            duration,
-            startTime,
-            endTime,
+        if (receiver.isBusy === true) {
+            return res.status(404).json({ status: 404, message: 'Receiver User is Busy' });
+        }
+
+        // Check for an ongoing voice call involving the same users
+        const existingVoiceCall = await VoiceCall.findOne({
+            $or: [
+                { $and: [{ caller: callerId }, { receiver: receiverId }, { status: 'Ongoing' }] },
+                { $and: [{ caller: receiverId }, { receiver: callerId }, { status: 'Ongoing' }] }
+            ]
         });
 
-        await voiceCall.save();
+        if (existingVoiceCall) {
+            return res.status(400).json({ status: 400, message: 'Voice call is already ongoing' });
+        }
 
-        // You might want to send a notification or trigger the call in your signaling mechanism
+        const newVoiceCall = new VoiceCall({
+            caller: callerId,
+            receiver: receiverId,
+            startTime: new Date(),
+        });
 
-        return res.status(201).json({ status: 201, message: 'Voice call initiated successfully', data: voiceCall });
+        await newVoiceCall.save();
+
+        return res.status(201).json({ status: 201, message: 'Voice call initiated successfully', data: newVoiceCall });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1550,27 +1558,37 @@ exports.acceptVoiceCall = async (req, res) => {
         const voiceCallId = req.params.id;
         const receiverId = req.user._id;
 
-        const user = await User.findById(receiverId);
-        if (!user) {
-            return res.status(404).json({ status: 404, message: 'User not found' });
-        }
-
-        const voiceCall = await VoiceCall.findOne({
-            _id: voiceCallId,
-            $or: [{ receiver: receiverId }, { caller: receiverId }],
-        });
-
+        const voiceCall = await VoiceCall.findById(voiceCallId);
         if (!voiceCall) {
             return res.status(404).json({ status: 404, message: 'Voice call not found' });
         }
 
-        user.IsBusy = true;
+        const user = await User.findById({ _id: receiverId });
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const user1 = await User.findOneAndUpdate(
+            { _id: voiceCall.receiver },
+            { $set: { isBusy: true } },
+            { new: true }
+        );
+
+        if (!user1) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const checkVoiceCallUser = await VoiceCall.findOne({ $and: [{ $or: [{ receiver: receiverId.toString() }, { caller: voiceCall.caller.toString() }] }, { $or: [{ receiver: voiceCall.caller.toString() }, { caller: receiverId.toString() }] }] });
+
+        if (!checkVoiceCallUser) {
+            return res.status(404).json({ status: 404, message: 'Voice call user not found' });
+        }
+
+        user.isBusy = true;
         await user.save();
 
         voiceCall.status = 'Ongoing';
         await voiceCall.save();
-
-        // You might want to send a notification or trigger the acceptance in your signaling mechanism
 
         return res.status(200).json({ status: 200, message: 'Voice call accepted successfully', data: voiceCall });
     } catch (error) {
@@ -1584,27 +1602,57 @@ exports.endVoiceCall = async (req, res) => {
         const voiceCallId = req.params.id;
         const userId = req.user._id;
 
-        const voiceCall = await VoiceCall.findOne({
-            _id: voiceCallId,
-            $or: [{ caller: userId }, { receiver: userId }],
-        });
-
+        const voiceCall = await VoiceCall.findById(voiceCallId);
         if (!voiceCall) {
             return res.status(404).json({ status: 404, message: 'Voice call not found' });
         }
 
-        voiceCall.status = 'Completed';
-        await voiceCall.save();
-
-        const user = await User.findById(userId);
-        if (user) {
-            user.IsBusy = false;
-            await user.save();
+        const user = await User.findById({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        // You might want to send a notification or trigger the end in your signaling mechanism
+        const user1 = await User.findOneAndUpdate(
+            { _id: voiceCall.receiver },
+            { $set: { isBusy: false } },
+            { new: true }
+        );
 
-        return res.status(200).json({ status: 200, message: 'Voice call ended successfully', data: voiceCall });
+        if (!user1) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const checkVoiceCallUser = await VoiceCall.findOne({ $and: [{ $or: [{ receiver: userId.toString() }, { caller: voiceCall.caller.toString() }] }, { $or: [{ receiver: voiceCall.caller.toString() }, { caller: userId.toString() }] }] });
+
+        if (!checkVoiceCallUser) {
+            return res.status(404).json({ status: 404, message: 'Voice call user not found' });
+        }
+
+
+        const durationInSeconds = Math.floor((new Date() - voiceCall.startTime) / 1000);
+
+        voiceCall.duration = durationInSeconds;
+
+        const hours = Math.floor(durationInSeconds / 3600);
+        const minutes = Math.floor((durationInSeconds % 3600) / 60);
+        const seconds = durationInSeconds % 60;
+
+
+        voiceCall.status = 'Completed';
+        voiceCall.endTime = new Date();
+
+        await voiceCall.save();
+
+
+        user.isBusy = false;
+        await user.save();
+
+        return res.status(200).json({
+            status: 200, message: 'Voice call ended successfully', data: {
+                voiceCall,
+                formattedDuration: `${hours > 0 ? hours + ' hours, ' : ''}${minutes > 0 ? minutes + ' minutes, ' : ''}${seconds} seconds`,
+            },
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1629,7 +1677,6 @@ exports.missedVoiceCall = async (req, res) => {
         voiceCall.status = 'Missed';
         await voiceCall.save();
 
-        // You might want to send a notification or handle missed call logic here
 
         return res.status(200).json({ status: 200, message: 'Missed call marked successfully', data: voiceCall });
     } catch (error) {
@@ -1638,6 +1685,511 @@ exports.missedVoiceCall = async (req, res) => {
     }
 };
 
+exports.addToCart = async (req, res) => {
+    try {
+        const { animalId, quantity } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const animal = await Animal.findById(animalId);
+        if (!animal) {
+            return res.status(404).json({ status: 404, message: 'Animal not found' });
+        }
+
+        if (typeof quantity !== 'number' || quantity <= 0) {
+            return res.status(400).json({ status: 400, message: 'Invalid quantity' });
+        }
+
+        let cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            const newCart = new Cart({ user: userId });
+            await newCart.save();
+            cart = await Cart.findOne({ user: userId });
+        }
+
+        if (!cart || !cart.items) {
+            return res.status(404).json({ status: 404, message: 'Cart or items not found' });
+        }
+
+        const existingItem = cart.items.find(item => item.animal.toString() === animalId);
+
+        if (existingItem) {
+            existingItem.quantity += quantity;
+        } else {
+            cart.items.push({ animal: animalId, quantity, price: animal.price });
+        }
+
+        cart.subTotal = await calculateSubTotal(cart.items);
+
+        const totalCartAmount = cart.subTotal;
+        const minShippingAmount1 = 40000;
+        const minShippingAmount2 = 80000;
+        const minShippingAmount3 = 100000;
+        const minShippingAmount4 = 200000;
+        const shippingPrice1 = 4000;
+        const shippingPrice2 = 1000;
+        const shippingPrice3 = 3000;
+        const shippingPrice4 = 2000;
+
+        if (totalCartAmount >= minShippingAmount4) {
+            cart.shipping = shippingPrice2;
+        } else if (totalCartAmount >= minShippingAmount3) {
+            cart.shipping = shippingPrice4;
+        } else if (totalCartAmount >= minShippingAmount2) {
+            cart.shipping = shippingPrice3;
+        } else if (totalCartAmount >= minShippingAmount1) {
+            cart.shipping = shippingPrice1;
+        } else {
+            cart.shipping = shippingPrice2;
+        }
 
 
+
+        cart.total = calculateTotal(cart.subTotal, cart.shipping);
+
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Item added to the cart', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId }).populate('items.animal')/*.populate('coupon')*/;
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        return res.status(200).json({ status: 200, data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+const updateShipping = (totalCartAmount) => {
+    const shippingTiers = [
+        { minAmount: 200000, price: 1000 },
+        { minAmount: 100000, price: 2000 },
+        { minAmount: 80000, price: 3000 },
+        { minAmount: 40000, price: 4000 },
+    ];
+
+    for (const tier of shippingTiers) {
+        if (totalCartAmount >= tier.minAmount) {
+            return tier.price;
+        }
+    }
+    return shippingTiers[shippingTiers.length - 1].price;
+};
+
+exports.updateCartItem = async (req, res) => {
+    try {
+        const { itemId, quantity } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        if (typeof quantity !== 'number' || quantity <= 0) {
+            return res.status(400).json({ status: 400, message: 'Invalid quantity' });
+        }
+
+        const cartItem = cart.items.find(item => item._id.toString() === itemId);
+
+        if (!cartItem) {
+            return res.status(404).json({ status: 404, message: 'Item not found in the cart' });
+        }
+
+        cartItem.quantity = quantity;
+
+        cart.subTotal = await calculateSubTotal(cart.items);
+
+        cart.shipping = updateShipping(cart.subTotal);
+
+        cart.total = calculateTotal(cart.subTotal, cart.shipping);
+
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Cart item updated successfully', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteCartItem = async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        const cartItemIndex = cart.items.findIndex(item => item._id.toString() === itemId);
+
+        if (cartItemIndex === -1) {
+            return res.status(404).json({ status: 404, message: 'Item not found in the cart' });
+        }
+
+        cart.items.splice(cartItemIndex, 1);
+
+        cart.subTotal = await calculateSubTotal(cart.items);
+
+        cart.shipping = updateShipping(cart.subTotal);
+
+        cart.total = await calculateTotal(cart.subTotal, cart.shipping);
+
+        if (cart.items.length === 0) {
+            await Cart.deleteOne({ _id: cart._id });
+            return res.status(200).json({ status: 200, message: 'Cart deleted successfully', data: null });
+        }
+
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Cart item deleted successfully', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.applyCoupon = async (req, res, next) => {
+    try {
+        const { couponCode } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const coupon = await Coupon.findOne({ code: couponCode });
+
+        if (!coupon) {
+            return res.status(400).json({ status: 400, message: 'Invalid coupon code' });
+        }
+
+        let cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        if (cart.items.some(item => item.coupon && item.coupon.toString() === coupon._id.toString())) {
+            return res.status(400).json({ status: 400, message: 'Coupon is already applied' });
+        }
+
+        cart.coupon = coupon._id;
+        cart.couponCode = coupon.code;
+        cart.discount = coupon.discount;
+        cart.isCouponApply = true;
+
+        cart.total = calculateTotalWithCoupon(cart.subTotal, cart.discount) + cart.shipping;
+
+        await cart.save();
+
+        res.status(200).json({ status: 200, success: true, data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.removeCoupon = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        let cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        cart.coupon = null;
+        cart.couponCode = null;
+        cart.discount = 0;
+        cart.isCouponApply = false;
+
+        cart.total = calculateTotalWithoutCoupon(cart.subTotal) + cart.shipping;
+
+        await cart.save();
+
+        res.status(200).json({ status: 200, success: true, data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+const calculateTotalWithCoupon = (subTotal, discountPercentage) => {
+    const discount = (subTotal * discountPercentage) / 100;
+    return subTotal - discount;
+};
+
+const calculateTotalWithoutCoupon = subTotal => subTotal;
+
+const calculateSubTotal = async (items) => {
+    if (!Array.isArray(items) || items.length === 0) {
+        return 0;
+    }
+
+    const animalIds = [...new Set(items.map(item => item.animal))];
+
+    const animals = await Animal.find({ _id: { $in: animalIds } });
+
+    const animalPrices = new Map(animals.map(animal => [animal._id.toString(), animal.price]));
+
+    return items.reduce((total, item) => {
+        const itemPrice = animalPrices.get(item.animal.toString()) || 0;
+        return total + itemPrice * item.quantity;
+    }, 0);
+};
+
+const calculateTotal = (subTotal, shipping) => {
+    return subTotal + shipping;
+};
+
+exports.addAddressToCart = async (req, res) => {
+    try {
+        const { addressId } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        if (!addressId) {
+            return res.status(400).json({ status: 400, message: 'AddressId is required' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+        const address = await Address.findOne({ _id: addressId, user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        if (!address) {
+            return res.status(404).json({ status: 404, message: 'Address not found' });
+        }
+
+        cart.address = addressId;
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Address added to the cart successfully', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateAddressInCart = async (req, res) => {
+    try {
+        const { addressId } = req.body;
+
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        if (!addressId) {
+            return res.status(400).json({ status: 400, message: 'AddressId is required' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+        const address = await Address.findOne({ _id: addressId, user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        if (!address) {
+            return res.status(404).json({ status: 404, message: 'Address not found' });
+        }
+
+        cart.address = addressId;
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Address in the cart updated successfully', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteAddressFromCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        cart.address = null;
+        await cart.save();
+
+        return res.status(200).json({ status: 200, message: 'Address removed from the cart successfully', data: cart });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAddressForCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId }).populate('address');
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Address for the cart retrieved successfully', data: cart.address });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+
+exports.checkout = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+
+        if (!cart || !cart.items || cart.items.length === 0) {
+            return res.status(400).json({ status: 400, message: 'Cart is empty' });
+        }
+
+        const subTotal = cart.subTotal;
+        const shipping = cart.shipping;
+        const total = subTotal + shipping;
+
+        let orderId = await reffralCode();
+
+        const order = new Order({
+            orderId: orderId,
+            user: user._id,
+            items: cart.items,
+            subTotal: subTotal,
+            shipping: shipping,
+            total: total,
+            orderStatus: "Unconfirmed",
+            status: "Pending",
+            paymentStatus: "Pending",
+        });
+
+        await order.save();
+
+        return res.status(200).json({ status: 200, message: 'Checkout successful', data: order });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.placeOrder = async (req, res) => {
+    try {
+        const orderId = req.params.orderId;
+        const userId = req.user._id;
+        const {paymentType, paymentStatus} = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        let findUserOrder = await Order.findOne({ orderId: orderId, user: userId });
+
+        if (!findUserOrder) {
+            return res.status(404).json({ status: 404, message: 'Order not found' });
+        }
+        const cart = await Cart.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({ status: 404, message: 'Cart not found' });
+        }
+
+        const order = new Order({
+            user: userId,
+            items: cart.items.map(item => ({
+                animal: item.animal,
+                quantity: item.quantity,
+                price: item.price,
+            })),
+            subTotal: cart.subTotal,
+            shipping: cart.shipping,
+            total: cart.total,
+        });
+
+        await order.save();
+
+        await Cart.findOneAndDelete({ user: userId });
+
+        return res.status(200).json({ status: 200, message: 'Order placed successfully', data: order });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
 
