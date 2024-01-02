@@ -15,7 +15,8 @@ const PublishAd = require('../models/publishAddModel');
 const SubscriptionPlan = require('../models/subscriptionPlanModel');
 const UserSubscription = require('../models/userSubscriptionModel');
 const cron = require('node-cron');
-
+const Order = require('../models/orderModel');
+const CardDetail = require('../models/cardDetailsModel');
 
 
 
@@ -583,6 +584,11 @@ exports.addReview = async (req, res) => {
 
         if (rating < 0 || rating > 5) {
             return res.status(400).json({ message: 'Invalid rating. Rating should be between 0 and 5.', data: {} });
+        }
+
+        const existingReview = animal.reviews.find((rev) => rev.user.equals(userId));
+        if (existingReview) {
+            return res.status(400).json({ status: 400, message: 'User has already reviewed this Animal' });
         }
 
         const newReview = { user: user._id, name: user.firstName + " " + user.lastName, rating, comment };
@@ -1331,5 +1337,52 @@ exports.deletePublishAdById = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllorder = async (req, res) => {
+    try {
+        const orders = await Order.find();
+        return res.status(200).json({ status: 200, data: orders });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllPaidOrder = async (req, res) => {
+    try {
+        const orders = await Order.find({ paymentStatus: "Paid" });
+        return res.status(200).json({ status: 200, data: orders });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateOrderStatus = async (req, res) => {
+    try {
+        const orderId = req.params.orderId;
+        const { orderStatus, status } = req.body;
+
+        const findUserOrder = await Order.findOne({ _id: orderId });
+        if (!findUserOrder) {
+            return res.status(404).json({ status: 404, message: 'Order not found' });
+        }
+
+        if (orderStatus !== undefined) {
+            findUserOrder.orderStatus = orderStatus;
+        }
+
+        if (status !== undefined) {
+            findUserOrder.status = status;
+        }
+
+        await findUserOrder.save();
+
+        return res.status(200).json({ status: 200, message: 'Order status updated successfully', data: findUserOrder });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
     }
 };

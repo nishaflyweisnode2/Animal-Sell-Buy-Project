@@ -74,6 +74,10 @@ module.exports = (app) => {
     app.get('/api/v1/admin/publish-ads/get', [authJwt.isAdmin], auth.getAllPublishAds);
     app.get('/api/v1/admin/publish-ads/:id', [authJwt.isAdmin], auth.getPublishAdById);
     app.delete('/api/v1/admin/publish-ads/:id', [authJwt.isAdmin], auth.deletePublishAdById);
+    app.get('/api/v1/admin/order/orders', [authJwt.isAdmin], auth.getAllorder)
+    app.get('/api/v1/admin/order/Paid-orders', [authJwt.isAdmin], auth.getAllPaidOrder)
+    app.put('/api/v1/admin/order/updateOrderStatus/:orderId', [authJwt.isAdmin], auth.updateOrderStatus);
+
 
 
 

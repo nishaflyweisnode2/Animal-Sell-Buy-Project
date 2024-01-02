@@ -5,7 +5,7 @@ const router = express()
 
 const authJwt = require("../middlewares/auth");
 
-const { profileImage, publishAddImage } = require('../middlewares/imageUpload');
+const { profileImage, publishAddImage, animalMelaImage, animalFeedsImage } = require('../middlewares/imageUpload');
 
 
 
@@ -87,5 +87,32 @@ module.exports = (app) => {
     app.get('/api/v1/user/cart/address', [authJwt.verifyToken], auth.getAddressForCart);
     app.post('/api/v1/user/cart/checkout', [authJwt.verifyToken], auth.checkout);
     app.post('/api/v1/user/order/placeOrder/:orderId', [authJwt.verifyToken], auth.placeOrder);
+    app.get('/api/v1/user/order/orders', [authJwt.verifyToken], auth.getOrder)
+    app.get('/api/v1/user/order/orders/:orderId', [authJwt.verifyToken], auth.getOrderById)
+    app.delete('/api/v1/user/order/orders/:orderId', [authJwt.verifyToken], auth.deleteOrder)
+    app.get('/api/v1/user/order/cards', [authJwt.verifyToken], auth.getCardDetails)
+    app.delete('/api/v1/user/order/cards/:cardId', [authJwt.verifyToken], auth.deleteSavedCard)
+    app.get('/api/v1/user/order/recive', [authJwt.verifyToken], auth.getOrderRecive)
+    app.put('/api/v1/user/order/updateOrderStatus/:orderId', [authJwt.verifyToken], auth.updateOrderStatus);
+    app.post('/api/v1/user/mela/animalmela', [authJwt.verifyToken], animalMelaImage.array('image'), auth.createAnimalMela)
+    app.get('/api/v1/user/mela/animalmela', [authJwt.verifyToken], auth.getAnimalMela)
+    app.get('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], auth.getAnimalMelaById)
+    app.put('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], animalMelaImage.array('image'), auth.updateAnimalMela)
+    app.delete('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], auth.deleteAnimalMelaById)
+    app.post('/api/v1/user/mela/animalmela/:id/like', [authJwt.verifyToken], auth.likeAnimalMela);
+    app.post('/api/v1/user/mela/animalmela/:id/dislike', [authJwt.verifyToken], auth.dislikeAnimalMela);
+    app.post('/api/v1/user/mela/animalmela/:id/comment', [authJwt.verifyToken], auth.commentOnAnimalMela);
+    app.post('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], animalFeedsImage.array('image'), auth.createAnimalFeed);
+    app.get('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], auth.getAllAnimalFeeds);
+    app.get('/api/v1/user/feed/animalfeeds/:id', [authJwt.verifyToken], auth.getAnimalFeedById);
+    app.put('/api/v1/user/feed/animalfeeds/:id', [authJwt.verifyToken], animalFeedsImage.array('image'), auth.updateAnimalFeedById);
+    app.delete('/api/v1/user/feed/animalfeeds/:id', [authJwt.verifyToken], auth.deleteAnimalFeedById);
+    app.post('/api/v1/user/feed/animalfeeds/:id/reviews', [authJwt.verifyToken], auth.addReviewAndRating);
+    app.get('/api/v1/user/animalfeeds/:id/reviews', [authJwt.verifyToken], auth.getAllReviewsForAnimalFeed);
+    app.get('/api/v1/user/animalfeeds/reviews', [authJwt.verifyToken], auth.getReviewsByToken);
+    app.get('/api/v1/user/animalfeeds/reviews/:id', [authJwt.verifyToken], auth.getReviewsByTokenAndAnimalFeedId);
+    app.post('/api/v1/user/animalfeeds/addFavorite/:id', [authJwt.verifyToken], auth.addFavoriteAnimalFeeds);
+    app.get('/api/v1/user/animalfeeds/getFavorite', [authJwt.verifyToken], auth.getFavoriteAnimalfeeds);
+    app.delete('/api/v1/user/animalfeeds/removeFavorite/:id', [authJwt.verifyToken], auth.removeFavoriteAnimalfeeds);
 
 }

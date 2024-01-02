@@ -74,6 +74,12 @@ const userSchema = new mongoose.Schema({
             ref: 'SellerDetails',
         }
     ],
+    favouriteAnimalFeed: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'AnimalFeed',
+        }
+    ],
     isBusy: {
         type: Boolean,
         default: false
