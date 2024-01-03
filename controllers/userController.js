@@ -16,8 +16,9 @@ const SubscriptionPlan = require('../models/subscriptionPlanModel');
 const UserSubscription = require('../models/userSubscriptionModel');
 const cron = require('node-cron');
 const VoiceCall = require('../models/voiceCallModel');
-const { Cart, AnimalCartItem, AnimalFeedCartItem } = require('../models/cartModel');
+const Cart = require('../models/cartModel');
 const Order = require('../models/orderModel');
+const Referral = require('../models/refferModel');
 const CardDetail = require('../models/cardDetailsModel');
 const AnimalMela = require('../models/animalMelaModel');
 const AnimalFeed = require('../models/animalFeedModel');
@@ -1223,6 +1224,28 @@ exports.createPublishAd = async (req, res) => {
 
 exports.getAllPublishAds = async (req, res) => {
     try {
+        const allPublishAds = await PublishAd.find().populate('species breed postBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        const adsWithCounts = allPublishAds.map(ad => {
+            const { _id, likes, dislikes, ...rest } = ad._doc;
+            const likeCount = likes.length;
+            const dislikeCount = dislikes.length;
+            return { _id, likeCount, dislikeCount, ...rest };
+        });
+
+        res.status(200).json({ message: 'All publish ads retrieved successfully', data: adsWithCounts });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllPublishUserAds = async (req, res) => {
+    try {
         const userId = req.user._id;
 
         const user = await User.findById(userId);
@@ -1230,8 +1253,20 @@ exports.getAllPublishAds = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const allPublishAds = await PublishAd.find({ postBy: userId }).populate('species breed');
-        res.status(200).json({ message: 'All publish ads retrieved successfully', data: allPublishAds });
+        const allPublishAds = await PublishAd.find({ postBy: userId }).populate('species breed postBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        const adsWithCounts = allPublishAds.map(ad => {
+            const { _id, likes, dislikes, ...rest } = ad._doc;
+            const likeCount = likes.length;
+            const dislikeCount = dislikes.length;
+            return { _id, likeCount, dislikeCount, ...rest };
+        });
+
+        res.status(200).json({ message: 'All publish ads retrieved successfully', data: adsWithCounts });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1241,13 +1276,23 @@ exports.getAllPublishAds = async (req, res) => {
 exports.getPublishAdById = async (req, res) => {
     try {
         const publishAdId = req.params.id;
-        const publishAd = await PublishAd.findById(publishAdId).populate('species breed');
+        const publishAd = await PublishAd.findById(publishAdId).populate('species breed postBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
 
         if (!publishAd) {
             return res.status(404).json({ status: 404, message: 'Publish ad not found' });
         }
 
-        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAd });
+        const { _id, likes, dislikes, ...rest } = publishAd._doc;
+        const likeCount = likes.length;
+        const dislikeCount = dislikes.length;
+
+        const publishAdWithCounts = { _id, likeCount, dislikeCount, ...rest };
+
+        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAdWithCounts });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1340,6 +1385,103 @@ exports.deletePublishAdById = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.likePublishAd = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const userId = req.user._id;
+
+        if (!mongoose.Types.ObjectId.isValid(publishAdId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const publishAd = await PublishAd.findById(publishAdId);
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const userLikedIndex = publishAd.likes.findIndex(like => like.user.equals(userId));
+        const userDislikedIndex = publishAd.dislikes.findIndex(dislike => dislike.user.equals(userId));
+
+        if (userLikedIndex !== -1) {
+            publishAd.likes.splice(userLikedIndex, 1);
+        } else {
+            publishAd.likes.push({ user: userId });
+
+            if (userDislikedIndex !== -1) {
+                publishAd.dislikes.splice(userDislikedIndex, 1);
+            }
+        }
+
+        await publishAd.save();
+
+        return res.status(200).json({ status: 200, message: 'Animal Mela liked successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.dislikePublishAd = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const userId = req.user._id;
+
+        if (!mongoose.Types.ObjectId.isValid(publishAdId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const publishAd = await PublishAd.findById(publishAdId);
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const userLikedIndex = publishAd.likes.findIndex(like => like.user.equals(userId));
+        const userDislikedIndex = publishAd.dislikes.findIndex(dislike => dislike.user.equals(userId));
+
+        if (userDislikedIndex !== -1) {
+            publishAd.dislikes.splice(userDislikedIndex, 1);
+        } else {
+            publishAd.dislikes.push({ user: userId });
+
+            if (userLikedIndex !== -1) {
+                publishAd.likes.splice(userLikedIndex, 1);
+            }
+        }
+
+        await publishAd.save();
+
+        return res.status(200).json({ status: 200, message: 'Animal Mela disliked successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.commentOnPublishAd = async (req, res) => {
+    try {
+        const publishAdId = req.params.id;
+        const userId = req.user._id;
+        const { text } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(publishAdId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const publishAd = await PublishAd.findById(publishAdId);
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        publishAd.comments.push({ user: userId, text });
+        await publishAd.save();
+
+        return res.status(200).json({ status: 200, message: 'Comment added successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
     }
 };
 
@@ -1688,19 +1830,14 @@ exports.missedVoiceCall = async (req, res) => {
     }
 };
 
-exports.addToCart1 = async (req, res) => {
+exports.addToCart = async (req, res) => {
     try {
-        const { animalId, quantity } = req.body;
+        const { animalId, animalFeedId, quantity } = req.body;
         const userId = req.user._id;
 
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ status: 404, message: 'User not found' });
-        }
-
-        const animal = await Animal.findById(animalId);
-        if (!animal) {
-            return res.status(404).json({ status: 404, message: 'Animal not found' });
         }
 
         if (typeof quantity !== 'number' || quantity <= 0) {
@@ -1710,21 +1847,44 @@ exports.addToCart1 = async (req, res) => {
         let cart = await Cart.findOne({ user: userId });
 
         if (!cart) {
-            const newCart = new Cart({ user: userId });
+            const newCart = new Cart({ user: userId, items: [] });
             await newCart.save();
-            cart = await Cart.findOne({ user: userId });
+            cart = newCart;
         }
 
         if (!cart || !cart.items) {
             return res.status(404).json({ status: 404, message: 'Cart or items not found' });
         }
 
-        const existingItem = cart.items.find(item => item.animal.toString() === animalId);
+        let existingItem;
+
+        if (animalId) {
+            existingItem = cart.items.find(item => item.animal && item.animal.toString() === animalId);
+        } else if (animalFeedId) {
+            existingItem = cart.items.find(item => item.animalFeed && item.animalFeed.toString() === animalFeedId);
+        }
 
         if (existingItem) {
             existingItem.quantity += quantity;
         } else {
-            cart.items.push({ animal: animalId, quantity, price: animal.price });
+            const newItem = {
+                quantity,
+                addedAt: new Date(),
+            };
+
+            if (animalId) {
+                newItem.animal = animalId;
+                newItem.type = 'animal';
+                const animal = await Animal.findById(animalId);
+                newItem.price = animal ? animal.price : 0;
+            } else if (animalFeedId) {
+                newItem.animalFeed = animalFeedId;
+                newItem.type = 'animalFeed';
+                const animalFeed = await AnimalFeed.findById(animalFeedId);
+                newItem.price = animalFeed ? animalFeed.originalPrice : 0;
+            }
+
+            cart.items.push(newItem);
         }
 
         cart.subTotal = await calculateSubTotal(cart.items);
@@ -1764,126 +1924,6 @@ exports.addToCart1 = async (req, res) => {
     }
 };
 
-const addToCartAnimal = async (cart, animalId, quantity) => {
-    console.log("animalId", animalId);
-    const animal = await Animal.findById(animalId);
-    console.log("animal", animal);
-
-    if (!animal) {
-        return false;
-    }
-
-    const existingAnimalItem = cart.items.find(item => {
-        console.log("item.animal", item.animal);
-        if (item.kind === 'AnimalCartItem' && item.animal && item.animal._id && item.animal._id.toString() === animalId.toString()) {
-            return true;
-        }
-        return false;
-    });
-
-    console.log("existingAnimalItem", existingAnimalItem);
-
-    if (existingAnimalItem) {
-        existingAnimalItem.quantity += quantity;
-    } else {
-        const newAnimalCartItem = new AnimalCartItem({
-            animal: animalId,
-            quantity,
-            price: animal.price,
-            type: 'animal'
-        });
-
-        cart.items.push(newAnimalCartItem);
-        console.log("newAnimalCartItem", newAnimalCartItem);
-    }
-
-    await cart.save();
-
-    return true;
-};
-
-
-
-const addToCartAnimalFeed = async (cart, animalFeedId, quantity) => {
-    const animalFeed = await AnimalFeed.findById(animalFeedId);
-    if (!animalFeed) {
-        return false;
-    }
-
-    const existingAnimalFeedItem = cart.items.find(item => item.kind === 'AnimalFeedCartItem' && item.animalFeed.toString() === animalFeedId);
-
-    if (existingAnimalFeedItem) {
-        existingAnimalFeedItem.quantity += quantity;
-    } else {
-        const newAnimalFeedCartItem = new AnimalFeedCartItem({ animalFeed: animalFeedId, quantity, price: animalFeed.originalPrice, type: 'animalFeed' });
-        cart.items.push(newAnimalFeedCartItem);
-    }
-
-    return true;
-};
-
-const calculateShipping = (subTotal) => {
-    const minShippingAmount1 = 40000;
-    const minShippingAmount2 = 80000;
-    const minShippingAmount3 = 100000;
-    const minShippingAmount4 = 200000;
-    const shippingPrice1 = 4000;
-    const shippingPrice2 = 1000;
-    const shippingPrice3 = 3000;
-    const shippingPrice4 = 2000;
-
-    if (subTotal >= minShippingAmount4) {
-        return shippingPrice2;
-    } else if (subTotal >= minShippingAmount3) {
-        return shippingPrice4;
-    } else if (subTotal >= minShippingAmount2) {
-        return shippingPrice3;
-    } else if (subTotal >= minShippingAmount1) {
-        return shippingPrice1;
-    } else {
-        return shippingPrice2;
-    }
-};
-
-exports.addToCart = async (req, res) => {
-    try {
-        const { animalId, animalFeedId, quantity } = req.body;
-        const userId = req.user._id;
-
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ status: 404, message: 'User not found' });
-        }
-
-        if (typeof quantity !== 'number' || quantity <= 0) {
-            return res.status(400).json({ status: 400, message: 'Invalid quantity' });
-        }
-
-        let cart = await Cart.findOne({ user: userId });
-
-        if (!cart) {
-            cart = new Cart({ user: userId, items: [] });
-        }
-
-        const animalAdded = await addToCartAnimal(cart, animalId, quantity);
-        const animalFeedAdded = await addToCartAnimalFeed(cart, animalFeedId, quantity);
-
-        if (animalAdded || animalFeedAdded) {
-            cart.subTotal = await calculateSubTotal(cart.items);
-            cart.shipping = calculateShipping(cart.subTotal);
-            cart.total = calculateTotal(cart.subTotal, cart.shipping);
-
-            await cart.save();
-        }
-
-        return res.status(200).json({ status: 200, message: 'Item added to the cart', data: cart });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
-    }
-};
-
-
 exports.getCart = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -1893,7 +1933,7 @@ exports.getCart = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const cart = await Cart.findOne({ user: userId }).populate('items.animal').populate('coupon address');
+        const cart = await Cart.findOne({ user: userId }).populate('items.animal items.animalFeed').populate('coupon address');
 
         if (!cart) {
             return res.status(404).json({ status: 404, message: 'Cart not found' });
@@ -2322,15 +2362,27 @@ exports.placeOrder = async (req, res) => {
         }
 
         findUserOrder.items = cart.items.map(item => ({
+            type: item.type,
             animal: item.animal,
+            animalFeed: item.animalFeed,
             quantity: item.quantity,
             price: item.price,
         }));
+
         findUserOrder.subTotal = cart.subTotal;
         findUserOrder.shipping = cart.shipping;
         findUserOrder.total = cart.total;
         findUserOrder.paymentStatus = paymentStatus;
         findUserOrder.paymentType = paymentType;
+
+        if (paymentType === "User Wallet") {
+            if (user.wallet < findUserOrder.total) {
+                return res.status(400).json({ status: 400, message: 'Insufficient wallet balance for payment' });
+            }
+
+            user.wallet -= findUserOrder.total;
+            await user.save();
+        }
 
         if (isCardSaved && cardDetails) {
             const existingCard = await CardDetail.findOne({
@@ -2378,7 +2430,7 @@ exports.getOrder = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const orders = await Order.find({ user: userId }).populate('items.animal').populate('address');
+        const orders = await Order.find({ user: userId }).populate('items.animal items.animalFeed').populate('address');
         return res.status(200).json({ status: 200, data: orders });
     } catch (error) {
         console.error(error);
@@ -2607,7 +2659,44 @@ exports.createAnimalMela = async (req, res) => {
 
 exports.getAnimalMela = async (req, res) => {
     try {
-        const animalMelas = await AnimalMela.find().populate('postedBy');
+        const animalMelas = await AnimalMela.find().populate('postedBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        const animalMelasWithCounts = animalMelas.map(animalMela => {
+            const likeCount = animalMela.likes.length;
+            const dislikeCount = animalMela.dislikes.length;
+
+            return {
+                ...animalMela._doc,
+                likeCount,
+                dislikeCount,
+            };
+        });
+
+        return res.status(200).json({ status: 200, data: animalMelasWithCounts });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalMelaByUser = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const animalMelas = await AnimalMela.find({ postedBy: userId }).populate('postedBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
 
         const animalMelasWithCounts = animalMelas.map(animalMela => {
             const likeCount = animalMela.likes.length;
@@ -2635,7 +2724,11 @@ exports.getAnimalMelaById = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
         }
 
-        const animalMela = await AnimalMela.findById(animalMelaId).populate('postedBy');
+        const animalMela = await AnimalMela.findById(animalMelaId).populate('postedBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
         if (!animalMela) {
             return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
         }
@@ -3186,3 +3279,74 @@ exports.removeFavoriteAnimalfeeds = async (req, res) => {
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
     }
 };
+
+exports.getUserWalletBalance = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        console.log("hii");
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const walletBalance = user.wallet;
+
+        return res.status(200).json({ status: 200, message: 'Wallet balance retrieved successfully', data: { walletBalance } });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.createReferral = async (req, res) => {
+    try {
+        const { referredUserId, referralCode } = req.body;
+
+        const referrerdUser = await User.findOne({ _id: referredUserId });
+
+        if (!referrerdUser) {
+            return res.status(400).json({ status: 400, message: 'user not found' });
+        }
+
+        const referrerUser = await User.findOne({ refferalCode: referralCode });
+
+        if (!referrerUser) {
+            return res.status(400).json({ status: 400, message: 'Invalid referral code' });
+        }
+
+        const referral = new Referral({
+            referrer: referrerUser._id,
+            referredUser: referredUserId,
+            referralCode,
+        });
+
+        await referral.save();
+
+        return res.status(201).json({ status: 201, message: 'Referral created successfully', data: referral });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Error creating referral', error: error.message });
+    }
+};
+
+exports.getAllReferrals = async (req, res) => {
+    try {
+        const referrals = await Referral.find();
+        res.status(200).json({ status: 200, data: referrals });
+    } catch (error) {
+        res.status(500).json({ status: 500, message: 'Server error', error: error.message });
+    }
+};
+
+exports.getReferralById = async (req, res) => {
+    try {
+        const referral = await Referral.findById(req.params.referralId);
+        if (!referral) {
+            return res.status(404).json({ status: 404, message: 'Referral not found' });
+        }
+        res.status(200).json({ status: 200, data: referral });
+    } catch (error) {
+        res.status(500).json({ status: 500, message: 'Server error', error: error.message });
+    }
+};
+

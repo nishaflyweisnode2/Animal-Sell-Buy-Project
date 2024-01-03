@@ -88,6 +88,37 @@ const publishAdSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    likes: [
+        {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        }
+    ],
+    dislikes: [
+        {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        }
+    ],
+    comments: [
+        {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+            text: {
+                type: String,
+            },
+            createdAt: {
+                type: Date,
+                default: Date.now,
+            }
+        }
+    ],
 }, { timestamps: true });
 
 const PublishAd = mongoose.model('PublishAd', publishAdSchema);

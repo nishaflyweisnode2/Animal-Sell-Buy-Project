@@ -16,7 +16,13 @@ const SubscriptionPlan = require('../models/subscriptionPlanModel');
 const UserSubscription = require('../models/userSubscriptionModel');
 const cron = require('node-cron');
 const Order = require('../models/orderModel');
+const Referral = require('../models/refferModel');
 const CardDetail = require('../models/cardDetailsModel');
+const AnimalMela = require('../models/animalMelaModel');
+const AnimalFeed = require('../models/animalFeedModel');
+const mongoose = require('mongoose');
+
+
 
 
 
@@ -1299,8 +1305,20 @@ exports.deleteUserSubscriptionById = async (req, res) => {
 
 exports.getAllPublishAds = async (req, res) => {
     try {
-        const allPublishAds = await PublishAd.find().populate('species breed');
-        res.status(200).json({ message: 'All publish ads retrieved successfully', data: allPublishAds });
+        const allPublishAds = await PublishAd.find().populate('species breed postBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        const adsWithCounts = allPublishAds.map(ad => {
+            const { _id, likes, dislikes, ...rest } = ad._doc;
+            const likeCount = likes.length;
+            const dislikeCount = dislikes.length;
+            return { _id, likeCount, dislikeCount, ...rest };
+        });
+
+        res.status(200).json({ message: 'All publish ads retrieved successfully', data: adsWithCounts });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1310,13 +1328,23 @@ exports.getAllPublishAds = async (req, res) => {
 exports.getPublishAdById = async (req, res) => {
     try {
         const publishAdId = req.params.id;
-        const publishAd = await PublishAd.findById(publishAdId).populate('species breed');
+        const publishAd = await PublishAd.findById(publishAdId).populate('species breed postBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
 
         if (!publishAd) {
             return res.status(404).json({ status: 404, message: 'Publish ad not found' });
         }
 
-        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAd });
+        const { _id, likes, dislikes, ...rest } = publishAd._doc;
+        const likeCount = likes.length;
+        const dislikeCount = dislikes.length;
+
+        const publishAdWithCounts = { _id, likeCount, dislikeCount, ...rest };
+
+        res.status(200).json({ message: 'Publish ad retrieved successfully', data: publishAdWithCounts });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1384,5 +1412,584 @@ exports.updateOrderStatus = async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getUserWalletBalance = async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const walletBalance = user.wallet;
+
+        return res.status(200).json({ status: 200, message: 'Wallet balance retrieved successfully', data: { walletBalance } });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.createAnimalMela = async (req, res) => {
+    try {
+        const { firstName, lastName, email, dateAndTimings, contact, isPublished } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        let images = [];
+        if (req.files) {
+            for (let j = 0; j < req.files.length; j++) {
+                let obj = {
+                    img: req.files[j].path,
+                };
+                images.push(obj);
+            }
+        }
+
+        const animalMelaData = {
+            postedBy: user._id,
+            firstName,
+            lastName,
+            email,
+            dateAndTimings,
+            contact,
+            images: images,
+            isPublished,
+        };
+
+        const newAnimalMela = await AnimalMela.create(animalMelaData);
+
+        if (!newAnimalMela) {
+            return res.status(400).json({ status: 400, message: 'Failed to create Animal Mela' });
+        }
+
+        return res.status(201).json({ status: 201, message: 'Animal Mela created successfully', data: newAnimalMela });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalMela = async (req, res) => {
+    try {
+        const animalMelas = await AnimalMela.find().populate('postedBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        const animalMelasWithCounts = animalMelas.map(animalMela => {
+            const likeCount = animalMela.likes.length;
+            const dislikeCount = animalMela.dislikes.length;
+
+            return {
+                ...animalMela._doc,
+                likeCount,
+                dislikeCount,
+            };
+        });
+
+        return res.status(200).json({ status: 200, data: animalMelasWithCounts });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalMelaById = async (req, res) => {
+    try {
+        const animalMelaId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalMelaId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const animalMela = await AnimalMela.findById(animalMelaId).populate('postedBy').populate({
+            path: 'comments.user',
+            model: 'User',
+            select: 'firstName lastName image mobileNumber email',
+        });
+        if (!animalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const likeCount = animalMela.likes.length;
+        const dislikeCount = animalMela.dislikes.length;
+
+        const animalMelaWithCounts = {
+            ...animalMela._doc,
+            likeCount,
+            dislikeCount,
+        };
+
+        return res.status(200).json({ status: 200, data: animalMelaWithCounts });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateAnimalMela = async (req, res) => {
+    try {
+        const animalMelaId = req.params.id;
+        const userId = req.user._id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalMelaId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const existingAnimalMela = await AnimalMela.findById(animalMelaId);
+        if (!existingAnimalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const updateData = {};
+
+        const fieldsToUpdate = ['firstName', 'lastName', 'email', 'dateAndTimings', 'contact', 'isPublished'];
+
+        fieldsToUpdate.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        });
+
+        if (req.files && req.files.length > 0) {
+            const newImages = req.files.map(file => ({ img: file.path }));
+            updateData.images = newImages;
+        }
+
+        const updatedAnimalMela = await AnimalMela.findByIdAndUpdate(animalMelaId, updateData, { new: true });
+        if (!updatedAnimalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Animal Mela updated successfully', data: updatedAnimalMela });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteAnimalMelaById = async (req, res) => {
+    try {
+        const animalMelaId = req.params.id;
+        if (!mongoose.Types.ObjectId.isValid(animalMelaId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID' });
+        }
+
+        const deletedAnimalMela = await AnimalMela.findByIdAndDelete(animalMelaId);
+        if (!deletedAnimalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Animal Mela deleted successfully', data: deletedAnimalMela });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.createAnimalFeed = async (req, res) => {
+    try {
+        const { category, owner, name, description, originalPrice, discountActive, discountPrice, location, isAvailable } = req.body;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+        const categoryId = await Category.findById(category);
+        if (!categoryId) {
+            return res.status(404).json({ status: 404, message: 'Category not found' });
+        }
+
+        let discount = 0;
+        if (discountActive && originalPrice && discountPrice) {
+            discount = (((originalPrice - discountPrice) / originalPrice) * 100).toFixed(2);
+        }
+
+        let images = [];
+        if (req.files) {
+            for (let j = 0; j < req.files.length; j++) {
+                let obj = {
+                    img: req.files[j].path,
+                };
+                images.push(obj);
+            }
+        }
+
+
+        const newAnimalFeed = new AnimalFeed({
+            category,
+            owner,
+            name,
+            description,
+            originalPrice,
+            discountActive,
+            discountPrice,
+            discount,
+            images: images,
+            location,
+            isAvailable
+        });
+
+        await newAnimalFeed.save();
+
+        return res.status(201).json({
+            status: 201,
+            message: 'AnimalFeed created successfully',
+            data: newAnimalFeed,
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllAnimalFeeds = async (req, res) => {
+    try {
+        const animalFeeds = await AnimalFeed.find().populate('category').populate('owner');
+        return res.status(200).json({ status: 200, data: animalFeeds });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAnimalFeedById = async (req, res) => {
+    try {
+        const animalFeedId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalFeedId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
+        }
+
+        const animalFeed = await AnimalFeed.findById(animalFeedId).populate('category').populate('owner');
+
+        if (!animalFeed) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
+        }
+
+        return res.status(200).json({ status: 200, data: animalFeed });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.updateAnimalFeedById = async (req, res) => {
+    try {
+        const animalFeedId = req.params.id;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        if (req.body.category) {
+            const categoryId = await Category.findById(req.body.category);
+            if (!categoryId) {
+                return res.status(404).json({ status: 404, message: 'Category not found' });
+            }
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(animalFeedId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
+        }
+
+        const updatedAnimalFeed = await AnimalFeed.findOneAndUpdate({ _id: animalFeedId, owner: userId }, req.body, { new: true });
+
+        if (!updatedAnimalFeed) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
+        }
+
+        if (req.body.discountActive !== undefined || req.body.originalPrice !== undefined || req.body.discountPrice !== undefined) {
+            const { originalPrice, discountActive, discountPrice } = updatedAnimalFeed;
+
+            if (discountActive && originalPrice && discountPrice) {
+                updatedAnimalFeed.discount = (((originalPrice - discountPrice) / originalPrice) * 100).toFixed(2);
+            } else {
+                updatedAnimalFeed.discount = 0;
+            }
+        }
+
+        if (req.files && req.files.length > 0) {
+            const newImages = req.files.map(file => ({ img: file.path }));
+            updatedAnimalFeed.images = newImages;
+        }
+
+        await updatedAnimalFeed.save();
+
+        return res.status(200).json({ status: 200, message: 'AnimalFeed updated successfully', data: updatedAnimalFeed });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteAnimalFeedById = async (req, res) => {
+    try {
+        const animalFeedId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalFeedId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
+        }
+
+        const deletedAnimalFeed = await AnimalFeed.findByIdAndDelete(animalFeedId);
+
+        if (!deletedAnimalFeed) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'AnimalFeed deleted successfully', data: deletedAnimalFeed });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.addReviewAndRating = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const animalFeedId = req.params.id;
+        const { rating, review } = req.body;
+
+        const user = await User.findById(userId);
+        const animalFeed = await AnimalFeed.findById(animalFeedId);
+
+        if (!user || !animalFeed) {
+            return res.status(404).json({ status: 404, message: 'User or AnimalFeed not found' });
+        }
+
+        if (rating < 0 || rating > 5) {
+            return res.status(400).json({ message: 'Invalid rating. Rating should be between 0 and 5.', data: {} });
+        }
+
+        const existingReview = animalFeed.reviews.find((rev) => rev.user.equals(userId));
+        if (existingReview) {
+            return res.status(400).json({ status: 400, message: 'User has already reviewed this AnimalFeed' });
+        }
+
+        animalFeed.reviews.push({
+            user: userId,
+            name: user.firstName + " " + user.lastName,
+            comment: review,
+            createdAt: new Date(),
+            rating: rating,
+        });
+
+        animalFeed.averageRating = parseFloat(((animalFeed.averageRating * animalFeed.numOfUserReviews + rating) / (animalFeed.numOfUserReviews + 1)).toFixed(2));
+
+        animalFeed.numOfUserReviews += 1; await animalFeed.save();
+
+        return res.status(201).json({
+            status: 201,
+            message: 'Review and rating added successfully',
+            data: animalFeed,
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllReviewsForAnimalFeed = async (req, res) => {
+    try {
+        const animalFeedId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalFeedId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
+        }
+
+        const animalFeed = await AnimalFeed.findById(animalFeedId).populate({
+            path: 'reviews.user',
+            select: 'firstName lastName image mobileNumber email',
+        });;
+
+        if (!animalFeed) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
+        }
+
+        return res.status(200).json({ status: 200, data: animalFeed.reviews });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getReviewsByToken = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ status: 404, message: 'User not found' });
+        }
+
+        const animalFeeds = await AnimalFeed.find({ "reviews.user": userId }).populate({
+            path: 'reviews.user',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        if (!animalFeeds) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeeds not found' });
+        }
+
+        const userReviews = [];
+
+        for (const animalFeed of animalFeeds) {
+            for (const review of animalFeed.reviews) {
+                if (review.user && review.user.equals(userId)) {
+                    userReviews.push({
+                        animalFeedId: animalFeed._id,
+                        review: review,
+                    });
+                }
+            }
+        }
+
+        return res.status(200).json({ status: 200, data: userReviews });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getReviewsByTokenAndAnimalFeedId = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const animalFeedId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(animalFeedId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
+        }
+
+        const animalFeed = await AnimalFeed.findById(animalFeedId).populate('reviews').populate({
+            path: 'reviews.user',
+            select: 'firstName lastName image mobileNumber email',
+        });
+
+        if (!animalFeed) {
+            return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
+        }
+
+        const userReviews = animalFeed.reviews.filter(review => review.user && review.user.equals(userId));
+
+        return res.status(200).json({ status: 200, data: userReviews });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+}
+
+exports.createReferral = async (req, res) => {
+    try {
+        const { referredUserId, referralCode } = req.body;
+
+        const referrerdUser = await User.findOne({ _id: referredUserId });
+
+        if (!referrerdUser) {
+            return res.status(400).json({ status: 400, message: 'user not found' });
+        }
+
+        const referrerUser = await User.findOne({ refferalCode: referralCode });
+
+        if (!referrerUser) {
+            return res.status(400).json({ status: 400, message: 'Invalid referral code' });
+        }
+
+        const referral = new Referral({
+            referrer: referrerUser._id,
+            referredUser: referredUserId,
+            referralCode,
+        });
+
+        await referral.save();
+
+        return res.status(201).json({ status: 201, message: 'Referral created successfully', data: referral });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Error creating referral', error: error.message });
+    }
+};
+
+exports.updateReferralStatus = async (req, res) => {
+    try {
+        const { referralId } = req.params;
+        const { status, reward } = req.body;
+
+        const referral = await Referral.findById(referralId);
+        if (!referral) {
+            return res.status(404).json({ message: 'Referral not found' });
+        }
+
+        if (status === 'Approved') {
+            const referrerUser = await User.findById(referral.referrer);
+
+            if (referrerUser) {
+                try {
+                    referrerUser.wallet += reward || 0;
+                    await referrerUser.save();
+                } catch (walletError) {
+                    console.error(walletError);
+                    return res.status(500).json({ message: 'Error updating referrer wallet balance', error: walletError.message });
+                }
+            }
+        }
+
+        referral.status = status;
+        referral.reward = reward || 0;
+        await referral.save();
+
+        res.status(200).json({ message: 'Referral updated successfully', data: referral });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+};
+
+exports.getAllReferrals = async (req, res) => {
+    try {
+        const referrals = await Referral.find();
+        res.status(200).json({ status: 200, data: referrals });
+    } catch (error) {
+        res.status(500).json({ status: 500, message: 'Server error', error: error.message });
+    }
+};
+
+exports.getReferralById = async (req, res) => {
+    try {
+        const referral = await Referral.findById(req.params.referralId);
+        if (!referral) {
+            return res.status(404).json({ status: 404, message: 'Referral not found' });
+        }
+        res.status(200).json({ status: 200, data: referral });
+    } catch (error) {
+        res.status(500).json({ status: 500, message: 'Server error', error: error.message });
+    }
+};
+
+exports.deleteReferral = async (req, res) => {
+    try {
+        const referral = await Referral.findByIdAndDelete(req.params.referralId);
+        if (!referral) {
+            return res.status(404).json({ status: 404, message: 'Referral not found' });
+        }
+        res.status(204).end();
+    } catch (error) {
+        res.status(500).json({ status: 500, message: 'Server error', error: error.message });
     }
 };

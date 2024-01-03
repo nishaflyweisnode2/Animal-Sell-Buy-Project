@@ -1,9 +1,17 @@
 const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
+    type: {
+        type: String,
+        enum: ['animal', 'animalFeed'],
+    },
     animal: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Animal',
+    },
+    animalFeed: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'AnimalFeed',
     },
     quantity: {
         type: Number,

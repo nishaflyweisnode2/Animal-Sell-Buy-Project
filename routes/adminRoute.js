@@ -5,7 +5,7 @@ const router = express()
 
 const authJwt = require("../middlewares/auth");
 
-const { profileImage, categoryUpload, subCategoryUpload, animalImage, couponImage, bannerImage } = require('../middlewares/imageUpload');
+const { profileImage, categoryUpload, subCategoryUpload, animalImage, couponImage, bannerImage, animalMelaImage, animalFeedsImage } = require('../middlewares/imageUpload');
 
 
 
@@ -77,7 +77,26 @@ module.exports = (app) => {
     app.get('/api/v1/admin/order/orders', [authJwt.isAdmin], auth.getAllorder)
     app.get('/api/v1/admin/order/Paid-orders', [authJwt.isAdmin], auth.getAllPaidOrder)
     app.put('/api/v1/admin/order/updateOrderStatus/:orderId', [authJwt.isAdmin], auth.updateOrderStatus);
-
+    app.get('/api/v1/admin/:userId/wallet', [authJwt.isAdmin], auth.getUserWalletBalance);
+    app.post('/api/v1/admin/mela/animalmela', [authJwt.isAdmin], animalMelaImage.array('image'), auth.createAnimalMela)
+    app.get('/api/v1/admin/mela/animalmela', [authJwt.isAdmin], auth.getAnimalMela)
+    app.get('/api/v1/admin/mela/animalmela/:id', [authJwt.isAdmin], auth.getAnimalMelaById)
+    app.put('/api/v1/admin/mela/animalmela/:id', [authJwt.isAdmin], animalMelaImage.array('image'), auth.updateAnimalMela)
+    app.delete('/api/v1/admin/mela/animalmela/:id', [authJwt.isAdmin], auth.deleteAnimalMelaById)
+    app.post('/api/v1/admin/feed/animalfeeds', [authJwt.isAdmin], animalFeedsImage.array('image'), auth.createAnimalFeed);
+    app.get('/api/v1/admin/feed/animalfeeds', [authJwt.isAdmin], auth.getAllAnimalFeeds);
+    app.get('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], auth.getAnimalFeedById);
+    app.put('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], animalFeedsImage.array('image'), auth.updateAnimalFeedById);
+    app.delete('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], auth.deleteAnimalFeedById);
+    app.post('/api/v1/admin/feed/animalfeeds/:id/reviews', [authJwt.isAdmin], auth.addReviewAndRating);
+    app.get('/api/v1/admin/animalfeeds/:id/reviews', [authJwt.isAdmin], auth.getAllReviewsForAnimalFeed);
+    app.get('/api/v1/admin/animalfeeds/reviews', [authJwt.isAdmin], auth.getReviewsByToken);
+    app.get('/api/v1/admin/animalfeeds/reviews/:id', [authJwt.isAdmin], auth.getReviewsByTokenAndAnimalFeedId);
+    app.post('/api/v1/admin/referral/create', [authJwt.isAdmin], auth.createReferral);
+    app.put('/api/v1/admin/referral/:referralId', [authJwt.isAdmin], auth.updateReferralStatus);
+    app.get('/api/v1/admin/referrals', [authJwt.isAdmin], auth.getAllReferrals);
+    app.get('/api/v1/admin/referrals/:referralId', [authJwt.isAdmin], auth.getReferralById);
+    app.delete('/api/v1/admin/referrals/:referralId', [authJwt.isAdmin], auth.deleteReferral);
 
 
 

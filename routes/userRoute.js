@@ -62,9 +62,13 @@ module.exports = (app) => {
     app.get('/api/v1/user/banners/:id', [authJwt.verifyToken], auth.getBannerById);
     app.post('/api/v1/user/publish-ads/create', [authJwt.verifyToken], publishAddImage.array('images'), auth.createPublishAd);
     app.get('/api/v1/user/publish-ads/get', [authJwt.verifyToken], auth.getAllPublishAds);
+    app.get('/api/v1/user/publish-ads/user/get', [authJwt.verifyToken], auth.getAllPublishUserAds);
     app.get('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], auth.getPublishAdById);
     app.put('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], publishAddImage.array('images'), auth.updatePublishAdById);
     app.delete('/api/v1/user/publish-ads/:id', [authJwt.verifyToken], auth.deletePublishAdById);
+    app.post('/api/v1/user/publish-ads/:id/like', [authJwt.verifyToken], auth.likePublishAd);
+    app.post('/api/v1/user/publish-ads/:id/dislike', [authJwt.verifyToken], auth.dislikePublishAd);
+    app.post('/api/v1/user/publish-ads/:id/comment', [authJwt.verifyToken], auth.commentOnPublishAd);
     app.get('/api/v1/user/subscription-plans', [authJwt.verifyToken], auth.getAllSubscriptionPlans);
     app.get('/api/v1/user/subscription-plans/:id', [authJwt.verifyToken], auth.getSubscriptionPlanById);
     app.post('/api/v1/user/user-subscriptions/create', [authJwt.verifyToken], auth.createUserSubscription);
@@ -96,6 +100,7 @@ module.exports = (app) => {
     app.put('/api/v1/user/order/updateOrderStatus/:orderId', [authJwt.verifyToken], auth.updateOrderStatus);
     app.post('/api/v1/user/mela/animalmela', [authJwt.verifyToken], animalMelaImage.array('image'), auth.createAnimalMela)
     app.get('/api/v1/user/mela/animalmela', [authJwt.verifyToken], auth.getAnimalMela)
+    app.get('/api/v1/user/mela/animalmela/user', [authJwt.verifyToken], auth.getAnimalMelaByUser)
     app.get('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], auth.getAnimalMelaById)
     app.put('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], animalMelaImage.array('image'), auth.updateAnimalMela)
     app.delete('/api/v1/user/mela/animalmela/:id', [authJwt.verifyToken], auth.deleteAnimalMelaById)
@@ -114,5 +119,9 @@ module.exports = (app) => {
     app.post('/api/v1/user/animalfeeds/addFavorite/:id', [authJwt.verifyToken], auth.addFavoriteAnimalFeeds);
     app.get('/api/v1/user/animalfeeds/getFavorite', [authJwt.verifyToken], auth.getFavoriteAnimalfeeds);
     app.delete('/api/v1/user/animalfeeds/removeFavorite/:id', [authJwt.verifyToken], auth.removeFavoriteAnimalfeeds);
+    app.get('/api/v1/user/wallet', [authJwt.verifyToken], auth.getUserWalletBalance);
+    app.post('/api/v1/user/referral/create', [authJwt.verifyToken], auth.createReferral);
+    app.get('/api/v1/user/referrals', [authJwt.verifyToken], auth.getAllReferrals);
+    app.get('/api/v1/user/referrals/:referralId', [authJwt.verifyToken], auth.getReferralById);
 
 }
