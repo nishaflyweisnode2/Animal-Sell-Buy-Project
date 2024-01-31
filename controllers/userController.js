@@ -51,7 +51,7 @@ exports.loginWithPhone = async (req, res) => {
             let otpExpiration = new Date(Date.now() + 60 * 1000);
             let accountVerification = false;
             const newUser = await User.create({ mobileNumber: mobileNumber, otp, otpExpiration, accountVerification, userType: "USER" });
-            let obj = { id: newUser._id, otp: newUser.otp, mobileNumber: newUser.mobileNumber }
+            // let obj = { id: newUser._id, otp: newUser.otp, mobileNumber: newUser.mobileNumber }
             const welcomeMessage = `Welcome, ${newUser.mobileNumber}! Thank you for registering.`;
             const welcomeNotification = new Notification({
                 recipient: newUser._id,
@@ -60,15 +60,15 @@ exports.loginWithPhone = async (req, res) => {
             });
             await welcomeNotification.save();
 
-            return res.status(200).send({ status: 200, message: "logged in successfully", data: obj });
+            return res.status(200).send({ status: 200, message: "logged in successfully", data: newUser });
         } else {
             const userObj = {};
             userObj.otp = newOTP.generate(4, { alphabets: false, upperCase: false, specialChar: false });
             userObj.otpExpiration = new Date(Date.now() + 60 * 1000);
             userObj.accountVerification = false;
             const updated = await User.findOneAndUpdate({ mobileNumber: mobileNumber, userType: "USER" }, userObj, { new: true });
-            let obj = { id: updated._id, otp: updated.otp, mobileNumber: updated.mobileNumber }
-            return res.status(200).send({ status: 200, message: "logged in successfully", data: obj });
+            // let obj = { id: updated._id, otp: updated.otp, mobileNumber: updated.mobileNumber }
+            return res.status(200).send({ status: 200, message: "logged in successfully", data: updated });
         }
     } catch (error) {
         console.error(error);
@@ -1147,7 +1147,7 @@ exports.getBannerById = async (req, res) => {
 
 exports.createPublishAd = async (req, res) => {
     try {
-        const { species, breed, age, gender, colour, location, address, healthCondition, vaccinationStatus, medicalHistory, microchipID, temperament, trainingLevel, socialization, videos, price, negotiation, reasonForSelling } = req.body;
+        const { species, breed, desc, age, gender, colour, location, address, healthCondition, vaccinationStatus, medicalHistory, microchipID, temperament, trainingLevel, socialization, videos, price, negotiation, reasonForSelling } = req.body;
 
         const userId = req.user._id;
 
@@ -1194,6 +1194,7 @@ exports.createPublishAd = async (req, res) => {
             postBy: user._id,
             species,
             breed,
+            desc,
             age,
             gender,
             colour,
@@ -2448,7 +2449,7 @@ exports.getOrderById = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const order = await Order.findOne({ _id: orderId, user: userId });
+        const order = await Order.findOne({ _id: orderId, user: userId }).populate('items.animal items.animalFeed').populate('address');
         if (!order) {
             return res.status(404).json({ status: 404, message: 'Order not found' });
         }
@@ -2905,6 +2906,24 @@ exports.commentOnAnimalMela = async (req, res) => {
         await animalMela.save();
 
         return res.status(200).json({ status: 200, message: 'Comment added successfully', data: animalMela });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.getAllAnimalFeedsByCategory = async (req, res) => {
+    try {
+        const { categoryId } = req.params;
+
+        const categories = await Category.find({ _id: categoryId });
+
+        if (!categories || categories.length === 0) {
+            return res.status(404).json({ message: "categories Not Found for the specified Category ID", status: 404, data: {} });
+        }
+
+        const animalFeeds = await AnimalFeed.find({ category: categoryId }).populate('category').populate('owner');
+        return res.status(200).json({ status: 200, data: animalFeeds });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });

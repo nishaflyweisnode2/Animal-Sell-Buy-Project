@@ -107,6 +107,7 @@ module.exports = (app) => {
     app.post('/api/v1/user/mela/animalmela/:id/like', [authJwt.verifyToken], auth.likeAnimalMela);
     app.post('/api/v1/user/mela/animalmela/:id/dislike', [authJwt.verifyToken], auth.dislikeAnimalMela);
     app.post('/api/v1/user/mela/animalmela/:id/comment', [authJwt.verifyToken], auth.commentOnAnimalMela);
+    app.get('/api/v1/user/feed/animalfeeds/category/:categoryId', [authJwt.verifyToken], auth.getAllAnimalFeedsByCategory);
     app.post('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], animalFeedsImage.array('image'), auth.createAnimalFeed);
     app.get('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], auth.getAllAnimalFeeds);
     app.get('/api/v1/user/feed/animalfeeds/:id', [authJwt.verifyToken], auth.getAnimalFeedById);

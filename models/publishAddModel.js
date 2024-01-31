@@ -13,6 +13,9 @@ const publishAdSchema = new mongoose.Schema({
         type: mongoose.Schema.ObjectId,
         ref: 'SubCategory'
     },
+    desc: {
+        type: String,
+    },
     age: {
         type: String,
     },
