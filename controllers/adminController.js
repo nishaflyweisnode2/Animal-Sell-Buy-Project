@@ -30,7 +30,8 @@ exports.registration = async (req, res) => {
     const { phone, email } = req.body;
     try {
         req.body.email = email.split(" ").join("").toLowerCase();
-        let user = await User.findOne({ $and: [{ $or: [{ email: req.body.email }, { phone: phone }] }], userType: "ADMIN" });
+        // let user = await User.findOne({ $and: [{ $or: [{ email: req.body.email }, { phone: phone }] }], userType: "ADMIN" });
+        let user = await User.findOne({ email: req.body.email, phone: phone, userType: "ADMIN" });
         if (!user) {
             req.body.password = bcrypt.hashSync(req.body.password, 8);
             req.body.userType = "ADMIN";
@@ -109,7 +110,17 @@ exports.update = async (req, res) => {
 
 exports.getAllUser = async (req, res) => {
     try {
-        const users = await User.find();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalUsers = await User.countDocuments();
+
+        const users = await User.find()
+            .skip(startIndex)
+            .limit(limit);
+
         if (!users || users.length === 0) {
             return res.status(404).json({ status: 404, message: 'Users not found' });
         }
@@ -124,9 +135,17 @@ exports.getAllUser = async (req, res) => {
             }),
         }));
 
+        const totalPages = Math.ceil(totalUsers / limit);
+
         return res.status(200).json({
             status: 200,
             data: formattedUsers,
+            pagination: {
+                totalUsers,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
         });
     } catch (error) {
         console.error(error);
@@ -253,8 +272,34 @@ exports.createCategory = async (req, res) => {
 
 exports.getCategories = async (req, res) => {
     try {
-        const categories = await Category.find({});
-        return res.status(201).json({ message: "Category Found", status: 200, data: categories, });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalCategories = await Category.countDocuments();
+
+        const categories = await Category.find()
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!categories || categories.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Categories not found' });
+        }
+
+        const totalPages = Math.ceil(totalCategories / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: "Categories Found",
+            data: categories,
+            pagination: {
+                totalCategories,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -324,8 +369,35 @@ exports.createSubCategory = async (req, res) => {
 
 exports.getSubCategories = async (req, res) => {
     try {
-        const SubCategories = await SubCategory.find({}).populate('Category');
-        return res.status(201).json({ message: "SubCategories Found", status: 200, data: SubCategories, });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalSubCategories = await SubCategory.countDocuments();
+
+        const subCategories = await SubCategory.find()
+            .populate('Category')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!subCategories || subCategories.length === 0) {
+            return res.status(404).json({ status: 404, message: 'SubCategories not found' });
+        }
+
+        const totalPages = Math.ceil(totalSubCategories / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: "SubCategories Found",
+            data: subCategories,
+            pagination: {
+                totalSubCategories,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: "Internal server error", data: error.message });
@@ -461,8 +533,35 @@ exports.createAnimal = async (req, res) => {
 
 exports.getAllAnimals = async (req, res) => {
     try {
-        const animals = await Animal.find().populate('reviews.user category subCategory owner');
-        return res.status(200).json({ status: 200, message: 'Animals retrieved successfully', data: animals });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalAnimals = await Animal.countDocuments();
+
+        const animals = await Animal.find()
+            .populate('reviews.user category subCategory owner')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!animals || animals.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Animals not found' });
+        }
+
+        const totalPages = Math.ceil(totalAnimals / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'Animals retrieved successfully',
+            data: animals,
+            pagination: {
+                totalAnimals,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -478,8 +577,35 @@ exports.getAllAnimalsForUser = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const animals = await Animal.find({ owner: userId }).populate('reviews.user category subCategory owner');
-        return res.status(200).json({ status: 200, message: 'Animals retrieved successfully', data: animals });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalAnimals = await Animal.countDocuments({ owner: userId });
+
+        const animals = await Animal.find({ owner: userId })
+            .populate('reviews.user category subCategory owner')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!animals || animals.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Animals not found' });
+        }
+
+        const totalPages = Math.ceil(totalAnimals / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'Animals retrieved successfully',
+            data: animals,
+            pagination: {
+                totalAnimals,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -615,9 +741,9 @@ exports.addReview = async (req, res) => {
 exports.getAllReviews = async (req, res) => {
     try {
         const animalId = req.params.id;
-        const userId = req.user._id;
+        const { id } = req.params;
 
-        const user = await User.findById(userId);
+        const user = await User.findById(id);
         if (!user) {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
@@ -632,7 +758,27 @@ exports.getAllReviews = async (req, res) => {
 
         const reviews = animal.reviews;
 
-        return res.status(200).json({ status: 200, message: 'Reviews retrieved successfully', data: reviews });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+
+        const paginatedReviews = reviews.slice(startIndex, endIndex);
+
+        const totalPages = Math.ceil(reviews.length / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'Reviews retrieved successfully',
+            data: paginatedReviews,
+            pagination: {
+                totalReviews: reviews.length,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -696,8 +842,35 @@ exports.createSellerDetails = async (req, res) => {
 
 exports.getAllSellerDetails = async (req, res) => {
     try {
-        const allSellerDetails = await SellerDetails.find().populate('sellerDetails animal');
-        return res.status(200).json({ status: 200, message: 'All seller details retrieved successfully', data: allSellerDetails });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalSellerDetails = await SellerDetails.countDocuments();
+
+        const allSellerDetails = await SellerDetails.find()
+            .populate('sellerDetails animal')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!allSellerDetails || allSellerDetails.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Seller details not found' });
+        }
+
+        const totalPages = Math.ceil(totalSellerDetails / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'All seller details retrieved successfully',
+            data: allSellerDetails,
+            pagination: {
+                totalSellerDetails,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -713,8 +886,35 @@ exports.getAllSellerDetailsForUser = async (req, res) => {
             return res.status(404).json({ status: 404, message: 'User not found' });
         }
 
-        const userSellerDetails = await SellerDetails.find({ sellerDetails: userId }).populate('sellerDetails animal');
-        return res.status(200).json({ status: 200, message: 'Seller details retrieved successfully', data: userSellerDetails });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalSellerDetails = await SellerDetails.countDocuments({ sellerDetails: userId });
+
+        const userSellerDetails = await SellerDetails.find({ sellerDetails: userId })
+            .populate('sellerDetails animal')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!userSellerDetails || userSellerDetails.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Seller details not found' });
+        }
+
+        const totalPages = Math.ceil(totalSellerDetails / limit);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'Seller details retrieved successfully',
+            data: userSellerDetails,
+            pagination: {
+                totalSellerDetails,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1305,11 +1505,26 @@ exports.deleteUserSubscriptionById = async (req, res) => {
 
 exports.getAllPublishAds = async (req, res) => {
     try {
-        const allPublishAds = await PublishAd.find().populate('species breed postBy').populate({
-            path: 'comments.user',
-            model: 'User',
-            select: 'firstName lastName image mobileNumber email',
-        });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalPublishAds = await PublishAd.countDocuments();
+
+        const allPublishAds = await PublishAd.find()
+            .populate('species breed postBy')
+            .populate({
+                path: 'comments.user',
+                model: 'User',
+                select: 'firstName lastName image mobileNumber email',
+            })
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!allPublishAds || allPublishAds.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Publish ads not found' });
+        }
 
         const adsWithCounts = allPublishAds.map(ad => {
             const { _id, likes, dislikes, ...rest } = ad._doc;
@@ -1318,7 +1533,18 @@ exports.getAllPublishAds = async (req, res) => {
             return { _id, likeCount, dislikeCount, ...rest };
         });
 
-        res.status(200).json({ message: 'All publish ads retrieved successfully', data: adsWithCounts });
+        const totalPages = Math.ceil(totalPublishAds / limit);
+
+        res.status(200).json({
+            message: 'All publish ads retrieved successfully',
+            data: adsWithCounts,
+            pagination: {
+                totalPublishAds,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error', data: error.message });
@@ -1370,8 +1596,33 @@ exports.deletePublishAdById = async (req, res) => {
 
 exports.getAllorder = async (req, res) => {
     try {
-        const orders = await Order.find();
-        return res.status(200).json({ status: 200, data: orders });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalOrders = await Order.countDocuments();
+
+        const orders = await Order.find()
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!orders || orders.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Orders not found' });
+        }
+
+        const totalPages = Math.ceil(totalOrders / limit);
+
+        return res.status(200).json({
+            status: 200,
+            data: orders,
+            pagination: {
+                totalOrders,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1380,8 +1631,33 @@ exports.getAllorder = async (req, res) => {
 
 exports.getAllPaidOrder = async (req, res) => {
     try {
-        const orders = await Order.find({ paymentStatus: "Paid" });
-        return res.status(200).json({ status: 200, data: orders });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalPaidOrders = await Order.countDocuments({ paymentStatus: "Paid" });
+
+        const orders = await Order.find({ paymentStatus: "Paid" })
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!orders || orders.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Paid orders not found' });
+        }
+
+        const totalPages = Math.ceil(totalPaidOrders / limit);
+
+        return res.status(200).json({
+            status: 200,
+            data: orders,
+            pagination: {
+                totalPaidOrders,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1479,11 +1755,26 @@ exports.createAnimalMela = async (req, res) => {
 
 exports.getAnimalMela = async (req, res) => {
     try {
-        const animalMelas = await AnimalMela.find().populate('postedBy').populate({
-            path: 'comments.user',
-            model: 'User',
-            select: 'firstName lastName image mobileNumber email',
-        });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalAnimalMelas = await AnimalMela.countDocuments();
+
+        const animalMelas = await AnimalMela.find()
+            .populate('postedBy')
+            .populate({
+                path: 'comments.user',
+                model: 'User',
+                select: 'firstName lastName image mobileNumber email',
+            })
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!animalMelas || animalMelas.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Animal melas not found' });
+        }
 
         const animalMelasWithCounts = animalMelas.map(animalMela => {
             const likeCount = animalMela.likes.length;
@@ -1496,7 +1787,18 @@ exports.getAnimalMela = async (req, res) => {
             };
         });
 
-        return res.status(200).json({ status: 200, data: animalMelasWithCounts });
+        const totalPages = Math.ceil(totalAnimalMelas / limit);
+
+        return res.status(200).json({
+            status: 200,
+            data: animalMelasWithCounts,
+            pagination: {
+                totalAnimalMelas,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1660,8 +1962,35 @@ exports.createAnimalFeed = async (req, res) => {
 
 exports.getAllAnimalFeeds = async (req, res) => {
     try {
-        const animalFeeds = await AnimalFeed.find().populate('category').populate('owner');
-        return res.status(200).json({ status: 200, data: animalFeeds });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const startIndex = (page - 1) * limit;
+
+        const totalAnimalFeeds = await AnimalFeed.countDocuments();
+
+        const animalFeeds = await AnimalFeed.find()
+            .populate('category')
+            .populate('owner')
+            .skip(startIndex)
+            .limit(limit);
+
+        if (!animalFeeds || animalFeeds.length === 0) {
+            return res.status(404).json({ status: 404, message: 'Animal feeds not found' });
+        }
+
+        const totalPages = Math.ceil(totalAnimalFeeds / limit);
+
+        return res.status(200).json({
+            status: 200,
+            data: animalFeeds,
+            pagination: {
+                totalAnimalFeeds,
+                totalPages,
+                currentPage: page,
+                pageSize: limit
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
@@ -1710,7 +2039,7 @@ exports.updateAnimalFeedById = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'Invalid AnimalFeed ID' });
         }
 
-        const updatedAnimalFeed = await AnimalFeed.findOneAndUpdate({ _id: animalFeedId, owner: userId }, req.body, { new: true });
+        const updatedAnimalFeed = await AnimalFeed.findOneAndUpdate({ _id: animalFeedId, /*owner: userId*/ }, req.body, { new: true });
 
         if (!updatedAnimalFeed) {
             return res.status(404).json({ status: 404, message: 'AnimalFeed not found' });
@@ -1963,8 +2292,18 @@ exports.updateReferralStatus = async (req, res) => {
 
 exports.getAllReferrals = async (req, res) => {
     try {
-        const referrals = await Referral.find();
-        res.status(200).json({ status: 200, data: referrals });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+       
+        const startIndex = (page - 1) * limit;
+        
+        const totalReferrals = await Referral.countDocuments();
+        const totalPages = Math.ceil(totalReferrals / limit);
+
+        const referrals = await Referral.find().skip(startIndex)
+        .limit(limit);
+
+        res.status(200).json({ status: 200, data: referrals, totalPages, currentPage: page });
     } catch (error) {
         res.status(500).json({ status: 500, message: 'Server error', error: error.message });
     }

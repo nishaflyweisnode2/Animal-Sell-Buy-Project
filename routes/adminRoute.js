@@ -86,7 +86,7 @@ module.exports = (app) => {
     app.post('/api/v1/admin/feed/animalfeeds', [authJwt.isAdmin], animalFeedsImage.array('image'), auth.createAnimalFeed);
     app.get('/api/v1/admin/feed/animalfeeds', [authJwt.isAdmin], auth.getAllAnimalFeeds);
     app.get('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], auth.getAnimalFeedById);
-    app.put('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], animalFeedsImage.array('image'), auth.updateAnimalFeedById);
+    app.put('/api/v1/admin/feed/animalfeeds/update/:id', [authJwt.isAdmin], animalFeedsImage.array('image'), auth.updateAnimalFeedById);
     app.delete('/api/v1/admin/feed/animalfeeds/:id', [authJwt.isAdmin], auth.deleteAnimalFeedById);
     app.post('/api/v1/admin/feed/animalfeeds/:id/reviews', [authJwt.isAdmin], auth.addReviewAndRating);
     app.get('/api/v1/admin/animalfeeds/:id/reviews', [authJwt.isAdmin], auth.getAllReviewsForAnimalFeed);
