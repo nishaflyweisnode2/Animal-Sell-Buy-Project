@@ -22,7 +22,7 @@ const Referral = require('../models/refferModel');
 const CardDetail = require('../models/cardDetailsModel');
 const AnimalMela = require('../models/animalMelaModel');
 const AnimalFeed = require('../models/animalFeedModel');
-
+const TermAndCondition = require('../models/term&conditionModel');
 
 
 
@@ -632,13 +632,21 @@ exports.searchAnimals = async (req, res) => {
                 },
                 { $unwind: "$subCategory" },
                 {
+                    $lookup: { from: "sellerdetails", localField: "sellerDetails", foreignField: "_id", as: "sellerDetails" },
+                },
+                { $unwind: "$sellerDetails" },
+                {
                     $match: {
                         $or: [
-                            { "category.name": { $regex: search, $options: "i" }, },
-                            { "subCategory.name": { $regex: search, $options: "i" }, },
-                            { "name": { $regex: search, $options: "i" }, },
-                            { "description": { $regex: search, $options: "i" }, },
-                            { "breed": { $regex: search, $options: "i" }, },
+                            { "category.name": { $regex: search, $options: "i" } },
+                            { "subCategory.name": { $regex: search, $options: "i" } },
+                            { "name": { $regex: search, $options: "i" } },
+                            { "description": { $regex: search, $options: "i" } },
+                            { "breed": { $regex: search, $options: "i" } },
+                            { "sellerDetails.sellerName": { $regex: search, $options: "i" } },
+                            { "sellerDetails.flock": { $regex: search, $options: "i" } },
+                            { "sellerDetails.age": { $regex: search, $options: "i" } },
+                            { "sellerDetails.weight": { $regex: search, $options: "i" } },
                         ]
                     }
                 },
@@ -652,11 +660,82 @@ exports.searchAnimals = async (req, res) => {
                 { $unwind: "$category" },
                 { $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategory", }, },
                 { $unwind: "$subCategory" },
+                { $lookup: { from: "sellerdetails", localField: "sellerDetails", foreignField: "_id", as: "sellerDetails" }, },
+                { $unwind: "$sellerDetails" },
                 { $sort: { numOfReviews: -1 } }
             ]);
 
             return res.status(200).json({ status: 200, message: "Animal data found.", data: apiFeature, count: animalCount });
         }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Error searching products', error: error.message });
+    }
+};
+
+exports.searchAnimals1 = async (req, res) => {
+    try {
+        const { search, category, breed, state } = req.query;
+
+        const animalCount = await Animal.countDocuments();
+
+        let pipeline = [
+            {
+                $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "category" }
+            },
+            { $unwind: "$category" },
+            {
+                $lookup: { from: "subcategories", localField: "subCategory", foreignField: "_id", as: "subCategory" }
+            },
+            { $unwind: "$subCategory" },
+            {
+                $lookup: { from: "sellerdetails", localField: "sellerDetails", foreignField: "_id", as: "sellerDetails" }
+            },
+            { $unwind: "$sellerDetails" }
+        ];
+
+        let matchConditions = {};
+
+        if (search) {
+            matchConditions.$or = [
+                { "category.name": { $regex: search, $options: "i" } },
+                { "subCategory.name": { $regex: search, $options: "i" } },
+                { "name": { $regex: search, $options: "i" } },
+                { "description": { $regex: search, $options: "i" } },
+                { "breed": { $regex: search, $options: "i" } },
+                { "sellerDetails.sellerName": { $regex: search, $options: "i" } },
+                { "sellerDetails.flock": { $regex: search, $options: "i" } },
+                { "sellerDetails.age": { $regex: search, $options: "i" } },
+                { "sellerDetails.weight": { $regex: search, $options: "i" } }
+            ];
+        }
+
+        if (category) {
+            matchConditions["category.name"] = { $regex: category, $options: "i" };
+        }
+
+        if (breed) {
+            matchConditions["breed"] = { $regex: breed, $options: "i" };
+        }
+
+        if (state) {
+            matchConditions["sellerDetails.address.state"] = { $regex: state, $options: "i" };
+        }
+
+        if (Object.keys(matchConditions).length > 0) {
+            pipeline.push({ $match: matchConditions });
+        }
+
+        pipeline.push({ $sort: { numOfReviews: -1 } });
+
+        let apiFeature = await Animal.aggregate(pipeline);
+
+        return res.status(200).json({
+            status: 200,
+            message: "Animal data found.",
+            data: apiFeature,
+            count: animalCount
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Error searching products', error: error.message });
@@ -781,6 +860,79 @@ exports.getReviewsForUserAndAnimal = async (req, res) => {
     }
 };
 
+exports.updateReview = async (req, res) => {
+    try {
+        const { rating, comment } = req.body;
+        const animalId = req.params.id;
+        const userId = req.user._id;
+
+        if (rating < 0 || rating > 5) {
+            return res.status(400).json({ status: 400, message: 'Invalid rating. Rating should be between 0 and 5.', data: {} });
+        }
+
+        const animal = await Animal.findById(animalId);
+        if (!animal) {
+            return res.status(404).json({ status: 404, message: 'Animal not found', data: {} });
+        }
+
+        const reviewIndex = animal.reviews.findIndex(review => review.user.toString() === userId.toString());
+        if (reviewIndex === -1) {
+            return res.status(404).json({ status: 404, message: 'Review not found', data: {} });
+        }
+
+        const oldRating = animal.reviews[reviewIndex].rating;
+
+        animal.reviews[reviewIndex].rating = rating;
+        animal.reviews[reviewIndex].comment = comment || animal.reviews[reviewIndex].comment;
+
+        animal.rating = parseFloat(((animal.rating * animal.numOfUserReviews - oldRating + rating) / animal.numOfUserReviews).toFixed(2));
+
+        await animal.save();
+
+        return res.status(200).json({ status: 200, message: 'Review updated successfully', data: animal.reviews[reviewIndex] });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteReview = async (req, res) => {
+    try {
+        const animalId = req.params.id;
+        const userId = req.user._id;
+
+        const animal = await Animal.findById(animalId);
+        if (!animal) {
+            return res.status(404).json({ status: 404, message: 'Animal not found', data: {} });
+        }
+
+        const reviewIndex = animal.reviews.findIndex(review => review.user.toString() === userId.toString());
+        if (reviewIndex === -1) {
+            return res.status(404).json({ status: 404, message: 'Review not found', data: {} });
+        }
+
+        const reviewToRemove = animal.reviews[reviewIndex];
+        const oldRating = reviewToRemove.rating;
+
+        animal.reviews.splice(reviewIndex, 1);
+
+        if (animal.numOfUserReviews > 1) {
+            animal.rating = parseFloat(((animal.rating * animal.numOfUserReviews - oldRating) / (animal.numOfUserReviews - 1)).toFixed(2));
+        } else {
+            animal.rating = 0;
+        }
+
+        animal.numOfUserReviews -= 1;
+
+        await animal.save();
+
+        return res.status(200).json({ status: 200, message: 'Review deleted successfully', data: {} });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
 exports.createSellerDetails = async (req, res) => {
     try {
         const { animal, flock, address, safetyTips } = req.body;
@@ -828,6 +980,8 @@ exports.createSellerDetails = async (req, res) => {
         });
 
         await newSellerDetails.save();
+        animalId.sellerDetails = newSellerDetails._id;
+        await animalId.save();
 
         return res.status(201).json({ status: 201, message: 'Seller details created successfully', data: newSellerDetails });
     } catch (error) {
@@ -2912,6 +3066,70 @@ exports.commentOnAnimalMela = async (req, res) => {
     }
 };
 
+exports.updateCommentOnAnimalMela = async (req, res) => {
+    try {
+        const animalMelaId = req.params.id;
+        const userId = req.user._id;
+        const { text } = req.body;
+        const { commentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(animalMelaId) || !mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID or Comment ID' });
+        }
+
+        const animalMela = await AnimalMela.findById(animalMelaId);
+        if (!animalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const comment = animalMela.comments.id(commentId);
+        if (!comment || comment.user.toString() !== userId.toString()) {
+            return res.status(404).json({ status: 404, message: 'Comment not found or not authorized' });
+        }
+
+        comment.text = text;
+        await animalMela.save();
+
+        return res.status(200).json({ status: 200, message: 'Comment updated successfully', data: comment });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteCommentOnAnimalMela = async (req, res) => {
+    try {
+        const animalMelaId = req.params.id;
+        const userId = req.user._id;
+        const { commentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(animalMelaId) || !mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Animal Mela ID or Comment ID' });
+        }
+
+        const animalMela = await AnimalMela.findById(animalMelaId);
+        if (!animalMela) {
+            return res.status(404).json({ status: 404, message: 'Animal Mela not found' });
+        }
+
+        const commentIndex = animalMela.comments.findIndex(
+            (comment) => comment._id.toString() === commentId && comment.user.toString() === userId.toString()
+        );
+
+        if (commentIndex === -1) {
+            return res.status(404).json({ status: 404, message: 'Comment not found or not authorized' });
+        }
+
+        animalMela.comments.splice(commentIndex, 1);
+        await animalMela.save();
+
+        return res.status(200).json({ status: 200, message: 'Comment deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
 exports.getAllAnimalFeedsByCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
@@ -3366,6 +3584,37 @@ exports.getReferralById = async (req, res) => {
         res.status(200).json({ status: 200, data: referral });
     } catch (error) {
         res.status(500).json({ status: 500, message: 'Server error', error: error.message });
+    }
+};
+
+exports.getAllTermAndCondition = async (req, res) => {
+    try {
+        const termAndCondition = await TermAndCondition.find();
+
+        if (!termAndCondition) {
+            return res.status(404).json({ status: 404, message: 'Terms and Conditions not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: "Sucessfully", data: termAndCondition });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', details: error.message });
+    }
+};
+
+exports.getTermAndConditionById = async (req, res) => {
+    try {
+        const termAndConditionId = req.params.id;
+        const termAndCondition = await TermAndCondition.findById(termAndConditionId);
+
+        if (!termAndCondition) {
+            return res.status(404).json({ status: 404, message: 'Terms and Conditions not found' });
+        }
+
+        return res.status(200).json({ status: 200, message: 'Sucessfully', data: termAndCondition });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error', details: error.message });
     }
 };
 

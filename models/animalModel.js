@@ -16,6 +16,10 @@ const animalSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     },
+    sellerDetails: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'SellerDetails',
+    },
     name: {
         type: String,
         required: true,

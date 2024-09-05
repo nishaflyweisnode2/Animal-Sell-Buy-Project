@@ -44,6 +44,8 @@ module.exports = (app) => {
     app.post('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.addReview);
     app.get('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.getAllReviews);
     app.get('/api/v1/user/animals/:id/reviews/user', [authJwt.verifyToken], auth.getReviewsForUserAndAnimal);
+    app.put('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.updateReview);
+    app.delete('/api/v1/user/animals/:id/reviews', [authJwt.verifyToken], auth.deleteReview);
     app.post('/api/v1/user/seller-details/user', [authJwt.verifyToken], auth.createSellerDetails);
     app.get('/api/v1/user/seller-details/user', [authJwt.verifyToken], auth.getAllSellerDetailsForUser);
     app.get('/api/v1/user/seller-details/animal/:animalId', [authJwt.verifyToken], auth.getSellerDetailsByAnimal);
@@ -107,6 +109,8 @@ module.exports = (app) => {
     app.post('/api/v1/user/mela/animalmela/:id/like', [authJwt.verifyToken], auth.likeAnimalMela);
     app.post('/api/v1/user/mela/animalmela/:id/dislike', [authJwt.verifyToken], auth.dislikeAnimalMela);
     app.post('/api/v1/user/mela/animalmela/:id/comment', [authJwt.verifyToken], auth.commentOnAnimalMela);
+    app.put('/api/v1/user/animalMelas/:id/comments/:commentId', [authJwt.verifyToken], auth.updateCommentOnAnimalMela);
+    app.delete('/api/v1/user/animalMelas/:id/comments/:commentId', [authJwt.verifyToken], auth.deleteCommentOnAnimalMela);
     app.get('/api/v1/user/feed/animalfeeds/category/:categoryId', [authJwt.verifyToken], auth.getAllAnimalFeedsByCategory);
     app.post('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], animalFeedsImage.array('image'), auth.createAnimalFeed);
     app.get('/api/v1/user/feed/animalfeeds', [authJwt.verifyToken], auth.getAllAnimalFeeds);
@@ -124,5 +128,7 @@ module.exports = (app) => {
     app.post('/api/v1/user/referral/create', [authJwt.verifyToken], auth.createReferral);
     app.get('/api/v1/user/referrals', [authJwt.verifyToken], auth.getAllReferrals);
     app.get('/api/v1/user/referrals/:referralId', [authJwt.verifyToken], auth.getReferralById);
+    app.get('/api/v1/partner/terms-and-conditions', [authJwt.verifyToken], auth.getAllTermAndCondition);
+    app.get('/api/v1/partner/terms-and-conditions/:id', [authJwt.verifyToken], auth.getTermAndConditionById);
 
 }

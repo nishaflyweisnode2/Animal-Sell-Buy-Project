@@ -97,7 +97,11 @@ module.exports = (app) => {
     app.get('/api/v1/admin/referrals', [authJwt.isAdmin], auth.getAllReferrals);
     app.get('/api/v1/admin/referrals/:referralId', [authJwt.isAdmin], auth.getReferralById);
     app.delete('/api/v1/admin/referrals/:referralId', [authJwt.isAdmin], auth.deleteReferral);
-
+    app.post('/api/v1/admin/terms-and-conditions', [authJwt.isAdmin], auth.createTermAndCondition);
+    app.get('/api/v1/admin/terms-and-conditions', [authJwt.isAdmin], auth.getAllTermAndCondition);
+    app.get('/api/v1/admin/terms-and-conditions/:id', [authJwt.isAdmin], auth.getTermAndConditionById);
+    app.put('/api/v1/admin/terms-and-conditions/:id', [authJwt.isAdmin], auth.updateTermAndConditionById);
+    app.delete('/api/v1/admin/terms-and-conditions/:id', [authJwt.isAdmin], auth.deleteTermAndConditionById);
 
 
 }
