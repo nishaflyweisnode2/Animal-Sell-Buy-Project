@@ -1301,7 +1301,7 @@ exports.getBannerById = async (req, res) => {
 
 exports.createPublishAd = async (req, res) => {
     try {
-        const { species, breed, desc, age, gender, colour, location, address, healthCondition, vaccinationStatus, medicalHistory, microchipID, temperament, trainingLevel, socialization, videos, price, negotiation, reasonForSelling } = req.body;
+        const { species, breed, desc, age, gender, colour, location, address, healthCondition, vaccinationStatus, medicalHistory, microchipID, temperament, trainingLevel, socialization, videos, price, negotiation, reasonForSelling, height, weight, length, milkProduction } = req.body;
 
         const userId = req.user._id;
 
@@ -1366,6 +1366,10 @@ exports.createPublishAd = async (req, res) => {
             price,
             negotiation,
             reasonForSelling,
+            height,
+            weight,
+            length,
+            milkProduction
         });
 
         await newPublishAd.save();
@@ -1634,6 +1638,37 @@ exports.commentOnPublishAd = async (req, res) => {
         await publishAd.save();
 
         return res.status(200).json({ status: 200, message: 'Comment added successfully', data: publishAd });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });
+    }
+};
+
+exports.deleteCommentOnPublishAd = async (req, res) => {
+    try {
+        const { publishAdId, commentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(publishAdId)) {
+            return res.status(400).json({ status: 400, message: 'Invalid Publish Ad ID' });
+        }
+
+        const publishAd = await PublishAd.findById(publishAdId);
+
+        if (!publishAd) {
+            return res.status(404).json({ status: 404, message: 'Publish Ad not found' });
+        }
+
+        const comment = publishAd.comments.id(commentId);
+
+        if (!comment) {
+            return res.status(404).json({ status: 404, message: 'Comment not found' });
+        }
+
+        publishAd.comments.pull(commentId);
+
+        await publishAd.save();
+
+        return res.status(200).json({ status: 200, message: 'Comment deleted successfully' });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: 500, message: 'Internal server error', data: error.message });

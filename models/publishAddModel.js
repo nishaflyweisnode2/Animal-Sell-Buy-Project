@@ -19,10 +19,22 @@ const publishAdSchema = new mongoose.Schema({
     age: {
         type: String,
     },
+    height: {
+        type: String,
+    },
+    weight: {
+        type: String,
+    },
+    length: {
+        type: String,
+    },
     gender: {
         type: String,
     },
     colour: {
+        type: String,
+    },
+    milkProduction: {
         type: String,
     },
     location: {

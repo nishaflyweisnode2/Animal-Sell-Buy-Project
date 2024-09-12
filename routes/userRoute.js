@@ -71,6 +71,7 @@ module.exports = (app) => {
     app.post('/api/v1/user/publish-ads/:id/like', [authJwt.verifyToken], auth.likePublishAd);
     app.post('/api/v1/user/publish-ads/:id/dislike', [authJwt.verifyToken], auth.dislikePublishAd);
     app.post('/api/v1/user/publish-ads/:id/comment', [authJwt.verifyToken], auth.commentOnPublishAd);
+    app.delete('/api/v1/user/publish-ads/:publishAdId/comments/:commentId', [authJwt.verifyToken], auth.deleteCommentOnPublishAd);
     app.get('/api/v1/user/subscription-plans', [authJwt.verifyToken], auth.getAllSubscriptionPlans);
     app.get('/api/v1/user/subscription-plans/:id', [authJwt.verifyToken], auth.getSubscriptionPlanById);
     app.post('/api/v1/user/user-subscriptions/create', [authJwt.verifyToken], auth.createUserSubscription);
